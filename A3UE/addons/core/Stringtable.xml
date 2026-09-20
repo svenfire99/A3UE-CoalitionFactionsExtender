@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project name="A3-Antistasi">
+    <Package name="A3UE-Your-Extender-Name">
+        <Key ID="STR_A3UE_params_YourExtenderName_ParamName">
+            <Original>This is the name of your parameter.</Original>
+            <French>Add localization here</French>
+            <Russian>Add localization here</Russian>
+            <German>Add localization here</German>
+            <Czech>Add localization here</Czech>
+            <Chinesesimp>Add localization here</Chinesesimp>
+            <Korean>Add localization here</Korean>
+            <Italian>Add localization here</Italian>
+            <Portuguese>Add localization here</Portuguese>
+            <Spanish>Add localization here</Spanish>
+            <Japanese>Add localization here</Japanese>
+            <Polish>Add localization here</Polish>
+            <Turkish>Add localization here</Turkish>
+        </Key>
+        <Key ID="STR_A3UE_params_YourExtenderName_ParamName_desc">
+            <Original>This is the extended description of your parameter and its values, shown when hovering the mouse over the param name in the UI.</Original>
+            <French>Add localization here</French>
+            <Russian>Add localization here</Russian>
+            <German>Add localization here</German>
+            <Czech>Add localization here</Czech>
+            <Chinesesimp>Add localization here</Chinesesimp>
+            <Korean>Add localization here</Korean>
+            <Italian>Add localization here</Italian>
+            <Portuguese>Add localization here</Portuguese>
+            <Spanish>Add localization here</Spanish>
+            <Japanese>Add localization here</Japanese>
+            <Polish>Add localization here</Polish>
+            <Turkish>Add localization here</Turkish>
+        </Key>
+    </Package>
+</Project>
