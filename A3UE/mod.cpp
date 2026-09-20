@@ -1,5 +1,4 @@
-name = "A3 Antistasi Ultimate Extender example";
-author = "A3-Antistasi dev team, A3-Antistasi Ultimate dev team";
-tooltip = "Antistasi Ultimate Extender example";
+name = "[A3UE] - Coalition Faction Extender [v1.0.0]";
+author = "SvenBrandt99";
 actionName = "GitHub";
-action = "https://github.com/Westalgie/A3UExtender"
+action = "https://github.com/svenfire99/A3UE-CoalitionFactionsExtender";
