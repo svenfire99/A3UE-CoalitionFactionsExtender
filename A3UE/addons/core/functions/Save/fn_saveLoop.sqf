@@ -1,4 +1,4 @@
-#include "\x\A3A\addons\core\script_component.hpp"
+#include "\x\A3A\addons\core\script_component.hpp" // This is purely to keep the save with the correct Version Number for AU itself.
 FIX_LINE_NUMBERS()
 if (!isServer) exitWith {
     Error("Miscalled server-only function");

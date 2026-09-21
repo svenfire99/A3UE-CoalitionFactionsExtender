@@ -8,6 +8,8 @@ class CfgFunctions
     {
         class CREATE
         {
+            class createUnit { file = QPATHTOFOLDER(functions\CREATE\fn_createUnit.sqf); };
+            class NATOinit { file = QPATHTOFOLDER(functions\CREATE\fn_NATOinit.sqf); };
             class spawnGroup { file = QPATHTOFOLDER(functions\CREATE\fn_spawnGroup.sqf); };
         };
 
@@ -16,10 +18,19 @@ class CfgFunctions
             class compatibilityLoadFaction { file = QPATHTOFOLDER(functions\Templates\fn_compatibilityLoadFaction.sqf); };
         };
 
+        class Missions {
+            class RES_Deserters { file = QPATHTOFOLDER(functions\Missions\fn_RES_Deserters.sqf); };
+        };
+
         class Save
         {
             class saveLoop { file = QPATHTOFOLDER(functions\Save\fn_saveLoop.sqf); };
             class collectSaveData { file = QPATHTOFOLDER(functions\Save\fn_collectSaveData.sqf); };
+        };
+
+        class Utility
+        {
+            class setIdentity { file = QPATHTOFOLDER(functions\Utility\fn_setIdentity.sqf); };
         };
     };
 
