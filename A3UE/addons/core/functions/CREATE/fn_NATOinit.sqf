@@ -34,20 +34,18 @@ if (isNil "_type") then {
     _type = typeOf _unit;
 };
 
+// ------------------------------------------------------------
+// Thorne Coalition faction resolution
+// ------------------------------------------------------------
+// Prefer the faction tag selected by spawnGroup. Fall back to the
+// unitType -> faction map for coalition units created through another path.
+if (!_isRival) then {
+    private _coalitionTag = (group _unit) getVariable [
+        "Thorne_CoalitionTag",
+        ""
+    ];
 
-// Resolve coalition faction from the group tag first.
-// spawnGroup sets Thorne_CoalitionTag on the group BEFORE createUnit is called,
-// so this works even before the unit itself receives its debug tag.
-private _fnc_resolveThorneFaction = {
-    params ["_unit", "_fallbackFaction", ["_type", ""]];
-
-    private _resolvedFaction = _fallbackFaction;
-    private _grp = group _unit;
-    private _tag = if (isNull _grp) then { "" } else {
-        _grp getVariable ["Thorne_CoalitionTag", ""]
-    };
-
-    private _prefix = switch (side _grp) do {
+    private _prefix = switch (_side) do {
         case west: { "occ" };
         case east: { "inv" };
         default { "" };
@@ -55,8 +53,8 @@ private _fnc_resolveThorneFaction = {
 
     if (
         _prefix != ""
-        && {_tag != ""}
-        && {_tag != "BASE"}
+        && {_coalitionTag != ""}
+        && {_coalitionTag != "BASE"}
         && {!isNil "Thorne_CoalitionFactions"}
     ) then {
         private _sidePool = Thorne_CoalitionFactions getOrDefault [
@@ -64,57 +62,40 @@ private _fnc_resolveThorneFaction = {
             createHashMap
         ];
 
-        private _tagFaction = _sidePool getOrDefault [
-            _tag,
+        private _coalitionFaction = _sidePool getOrDefault [
+            _coalitionTag,
             createHashMap
         ];
 
         if (
-            _tagFaction isEqualType createHashMap
-            && {count _tagFaction > 0}
+            _coalitionFaction isEqualType createHashMap
+            && {count _coalitionFaction > 0}
         ) then {
-            _resolvedFaction = _tagFaction;
+            _faction = _coalitionFaction;
         };
     };
 
-    // Redundant fallback for coalition types created outside spawnGroup.
+    // Redundant fallback.
     if (
-        _resolvedFaction isEqualTo _fallbackFaction
-        && {_type != ""}
+        _faction isEqualTo Faction(_side)
+        && {_type isEqualType ""}
+        && {_type isNotEqualTo ""}
         && {!isNil "Thorne_CoalitionTypeFactionMap"}
     ) then {
-        private _typeFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
+        private _coalitionFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
             _type,
             createHashMap
         ];
 
         if (
-            _typeFaction isEqualType createHashMap
-            && {count _typeFaction > 0}
+            _coalitionFaction isEqualType createHashMap
+            && {count _coalitionFaction > 0}
         ) then {
-            _resolvedFaction = _typeFaction;
+            _faction = _coalitionFaction;
         };
     };
 
-    _resolvedFaction
-};
-
-if (!_isRival) then {
-    _faction = [
-        _unit,
-        _faction,
-        _type
-    ] call _fnc_resolveThorneFaction;
-
-    private _coalitionTag = (group _unit) getVariable [
-        "Thorne_CoalitionTag",
-        ""
-    ];
-
-    if (
-        _coalitionTag != ""
-        && {_coalitionTag != "BASE"}
-    ) then {
+    if (_coalitionTag != "" && {_coalitionTag != "BASE"}) then {
         diag_log format [
             "[Thorne Coalition Identity] NATOinit tag='%1' type='%2' faction='%3'",
             _coalitionTag,
@@ -124,25 +105,75 @@ if (!_isRival) then {
     };
 };
 
+if (_type == "Fin_random_F") exitWith {};
+
+
+// Set source resource pool for unit
+if (isNil "_resPool") then {
+    // Avoiding editing every garrison/mission file for now
+    _resPool = ["legacy", "garrison"] select (_marker != "");
+};
+_unit setVariable ["A3A_resPool", _resPool, true];
+
+if !(isNil "_isSpawner") then
+{
+    if (_isSpawner) then { _unit setVariable ["spawner",true,true] };
+    if (_marker != "") then { _unit setVariable ["markerX",_marker,true] };
+}
+else
+{
+    private _veh = objectParent _unit;
+    if (_marker != "") exitWith
+    {
+        // Persistent garrison units are never spawners.
+	    _unit setVariable ["markerX",_marker,true];
+	    if ((spawner getVariable _marker != 0) && (isNull _veh)) then
+	    {
+            // Garrison drifted out of spawn range, disable simulation on foot units
+            // this is re-enabled in distance.sqf when spawn range is re-entered
+            [_unit,false] remoteExec ["enableSimulationGlobal",2];
+        };
+    };
+
+    if (_unit in (assignedCargo _veh)) exitWith
+    {
+        // Cargo units aren't spawners until they leave the vehicle.
+        // Assumes that they'll get out if the crew are murdered.
+        _unit setVariable ["spawner", false];            // local-only, use to distinguish when spawner status is removed
+        _unit addEventHandler ["GetOutMan", {
+            _unit = _this select 0;
+            if (!isNil {_unit getVariable "spawner"}) then {
+                _unit setVariable ["spawner",true,true];
+            };
+            _unit removeEventHandler [_thisEvent, _thisEventHandler];
+        }];
+    };
+
+	// Fixed-wing aircraft spawn far too much with little effect.
+	// Don't even spawn if ejected, because they often end up miles away from the real action
+	if (_veh isKindOf "Plane") exitWith {};
+
+    // Rivals are insurgency units that have no intention to capture points
+    if (_isRival) exitWith {};
+
+    // Everyone else is a spawner
+	_unit setVariable ["spawner",true,true]
+};
+
+// Install event handlers for the unit
+_unit addEventHandler ["HandleDamage", A3A_fnc_handleDamageAAF];
+_unit addEventHandler ["Killed", A3A_fnc_enemyUnitKilledEH];
+_unit addEventHandler ["Deleted", A3A_fnc_enemyUnitDeletedEH];
+
+
 //Calculates the skill of the given unit
 private _skill = (0.1 * A3A_enemySkillMul) + (0.07 * (1 max A3A_activePlayerCount^0.5)) + (0.01 * tierWar);
-
 private _regularFaces = [];
 private _regularVoices = [];
 private _regularInsignia = [];
 private _face = "";
 private _voice = "";
 private _insignia = "";
-
-if (_isRival) then {
-    _regularFaces = A3A_faction_riv getOrDefault ["faces", []];
-    _regularVoices = A3A_faction_riv getOrDefault ["voices", []];
-    _regularInsignia = A3A_faction_riv getOrDefault ["insignia", []];
-} else {
-    _regularFaces = _faction getOrDefault ["faces", []];
-    _regularVoices = _faction getOrDefault ["voices", []];
-    _regularInsignia = _faction getOrDefault ["insignia", []];
-};
 
 private _fnc_pickIdentityValue = {
     params ["_values", ["_fallback", ""]];
@@ -157,105 +188,59 @@ private _fnc_pickIdentityValue = {
     _fallback
 };
 
+if (_isRival) then {
+    _regularFaces = A3A_faction_riv getOrDefault ["faces", []];
+    _regularVoices = A3A_faction_riv getOrDefault ["voices", []];
+    _regularInsignia = A3A_faction_riv getOrDefault ["insignia", []];
+} else {
+    _regularFaces = _faction getOrDefault ["faces", []];
+    _regularVoices = _faction getOrDefault ["voices", []];
+    _regularInsignia = _faction getOrDefault ["insignia", []];
+};
+
 switch (true) do {
     case (_isRival): {
         _skill = _skill * 0.9;
-        _face = [_regularFaces] call _fnc_pickIdentityValue;
-        _voice = [_regularVoices] call _fnc_pickIdentityValue;
-        _insignia = [_regularInsignia] call _fnc_pickIdentityValue;
+        _face = [A3A_faction_riv getOrDefault ["faces", []]] call _fnc_pickIdentityValue;
+        _voice = [A3A_faction_riv getOrDefault ["voices", []]] call _fnc_pickIdentityValue;
     };
-
     case (_unitPrefix isEqualTo "militia"): {
         _skill = _skill * 0.7;
-        _face = [
-            _faction getOrDefault ["milFaces", _regularFaces]
-        ] call _fnc_pickIdentityValue;
-
-        _voice = [
-            _faction getOrDefault ["milVoices", _regularVoices]
-        ] call _fnc_pickIdentityValue;
-
-        _insignia = [
-            _faction getOrDefault ["milInsignia", _regularInsignia]
-        ] call _fnc_pickIdentityValue;
+        _face = [_faction getOrDefault ["milFaces", _regularFaces]] call _fnc_pickIdentityValue;
+        _voice = [_faction getOrDefault ["milVoices", _regularVoices]] call _fnc_pickIdentityValue;
+        _insignia = [_faction getOrDefault ["milInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
     };
-
     case (_unitPrefix isEqualTo "police"): {
         _skill = _skill * 0.5;
-        _face = [
-            _faction getOrDefault ["polFaces", _regularFaces]
-        ] call _fnc_pickIdentityValue;
-
-        _voice = [
-            _faction getOrDefault ["polVoices", _regularVoices]
-        ] call _fnc_pickIdentityValue;
-
-        _insignia = [
-            _faction getOrDefault ["polInsignia", _regularInsignia]
-        ] call _fnc_pickIdentityValue;
+        _face = [_faction getOrDefault ["polFaces", _regularFaces]] call _fnc_pickIdentityValue;
+        _voice = [_faction getOrDefault ["polVoices", _regularVoices]] call _fnc_pickIdentityValue;
+        _insignia = [_faction getOrDefault ["polInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
     };
-
     case (_unitPrefix isEqualTo "elite"): {
         _skill = _skill * 1.1;
-        _face = [
-            _faction getOrDefault ["eliteFaces", _regularFaces]
-        ] call _fnc_pickIdentityValue;
-
-        _voice = [
-            _faction getOrDefault ["eliteVoices", _regularVoices]
-        ] call _fnc_pickIdentityValue;
-
-        _insignia = [
-            _faction getOrDefault ["eliteInsignia", _regularInsignia]
-        ] call _fnc_pickIdentityValue;
+        _face = [_faction getOrDefault ["eliteFaces", _regularFaces]] call _fnc_pickIdentityValue;
+        _voice = [_faction getOrDefault ["eliteVoices", _regularVoices]] call _fnc_pickIdentityValue;
+        _insignia = [_faction getOrDefault ["eliteInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
     };
-
     case (_unitPrefix isEqualTo "SF"): {
         _skill = _skill * 1.2;
-        _face = [
-            _faction getOrDefault ["sfFaces", _regularFaces]
-        ] call _fnc_pickIdentityValue;
-
-        _voice = [
-            _faction getOrDefault ["sfVoices", _regularVoices]
-        ] call _fnc_pickIdentityValue;
-
-        _insignia = [
-            _faction getOrDefault ["sfInsignia", _regularInsignia]
-        ] call _fnc_pickIdentityValue;
+        _face = [_faction getOrDefault ["sfFaces", _regularFaces]] call _fnc_pickIdentityValue;
+        _voice = [_faction getOrDefault ["sfVoices", _regularVoices]] call _fnc_pickIdentityValue;
+        _insignia = [_faction getOrDefault ["sfInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
     };
-
     case ("Traitor" in _type): {
-        _face = [
-            A3A_faction_reb getOrDefault ["faces", []]
-        ] call _fnc_pickIdentityValue;
+        _face = [A3A_faction_reb getOrDefault ["faces", []]] call _fnc_pickIdentityValue;
         _voice = "NoVoice";
     };
-
     default {
         _face = [_regularFaces] call _fnc_pickIdentityValue;
         _voice = [_regularVoices] call _fnc_pickIdentityValue;
         _insignia = [_regularInsignia] call _fnc_pickIdentityValue;
     };
 };
-
-private _identity = createHashMap;
-
-if (_face isNotEqualTo "") then {
-    _identity set ["face", _face];
-};
-
-if (_voice isNotEqualTo "") then {
-    _identity set ["speaker", _voice];
-};
-
-_identity set ["pitch", random [0.9, 1, 1.1]];
-
-[_unit, _identity] call A3A_fnc_setIdentity;
-
+[_unit, createHashMapFromArray [["face", _face], ["speaker", _voice], ["pitch", (random [0.9, 1, 1.1])]]] call A3A_fnc_setIdentity;
 _unit setSkill _skill;
-
-if (_insignia isNotEqualTo "") then {
+if (!isNil "_insignia" && {_insignia isNotEqualTo ""}) then {
    [_unit, _insignia] call BIS_fnc_setUnitInsignia;
 };
 
