@@ -1,8 +1,7 @@
 /*
-    Do NOT redefine A3A_SetupDialog directly.
-
-    A3UE_Coalition_SetupDialog inherits the current A3AU dialog and only
-    changes the faction controls needed for coalition selection.
+    A3UE coalition setup dialog.
+    Base layout stays entirely AU-owned; only the three enemy list styles
+    and one checkbox are changed.
 */
 class A3UE_Coalition_SetupDialog : A3A_SetupDialog
 {
@@ -16,39 +15,48 @@ class A3UE_Coalition_SetupDialog : A3A_SetupDialog
         {
             class Controls : Controls
             {
-                // Rebels stay normal single-select.
                 class RebelsLabel : RebelsLabel {};
                 class RebelsListBox : RebelsListBox {};
 
-                // Civilians stay normal single-select.
                 class CiviliansLabel : CiviliansLabel {};
                 class CiviliansListBox : CiviliansListBox {};
 
                 class OccupantsLabel : OccupantsLabel {};
-
-                // LB_MULTI = 32. This keeps multiple selected rows highlighted
-                // with A3AU's normal orange selected-row background.
-                class OccupantsListBox : OccupantsListBox
+                class OccupantsListBox : A3A_Listbox_Small
                 {
+                    idc = A3A_IDC_SETUP_OCCUPANTSLISTBOX;
                     style = 32;
+                    onLBSelChanged = "['factionSelected', _this] call A3A_fnc_setupFactionsTab";
+                    x = 44 * GRID_W;
+                    y = 8 * GRID_H;
+                    w = 38 * GRID_W;
+                    h = 88 * GRID_H;
                 };
 
                 class InvadersLabel : InvadersLabel {};
-
-                class InvadersListBox : InvadersListBox
+                class InvadersListBox : A3A_Listbox_Small
                 {
+                    idc = A3A_IDC_SETUP_INVADERSLISTBOX;
                     style = 32;
+                    onLBSelChanged = "['factionSelected', _this] call A3A_fnc_setupFactionsTab";
+                    x = 84 * GRID_W;
+                    y = 8 * GRID_H;
+                    w = 38 * GRID_W;
+                    h = 40 * GRID_H;
                 };
 
                 class RivalsLabel : RivalsLabel {};
-
-                // Rivals use the same native LB_MULTI selection as OCC/INV.
-                class RivalsListBox : RivalsListBox
+                class RivalsListBox : A3A_Listbox_Small
                 {
+                    idc = A3A_IDC_SETUP_RIVALSLISTBOX;
                     style = 32;
+                    onLBSelChanged = "['factionSelected', _this] call A3A_fnc_setupFactionsTab";
+                    x = 84 * GRID_W;
+                    y = 54 * GRID_H;
+                    w = 38 * GRID_W;
+                    h = 42 * GRID_H;
                 };
 
-                // Add one extra checkbox below the existing four override rows.
                 class ModifiersGroup : ModifiersGroup
                 {
                     h = 24 * GRID_H;
@@ -88,7 +96,6 @@ class A3UE_Coalition_SetupDialog : A3A_SetupDialog
                     };
                 };
 
-                // Shift the remaining right-side groups down to make room.
                 class DLCContentGroup : DLCContentGroup
                 {
                     y = 30 * GRID_H;
@@ -97,14 +104,8 @@ class A3UE_Coalition_SetupDialog : A3A_SetupDialog
                     class controls : controls
                     {
                         class Label : Label {};
-                        class Background : Background
-                        {
-                            h = 16 * GRID_H;
-                        };
-                        class Box : Box
-                        {
-                            h = 16 * GRID_H;
-                        };
+                        class Background : Background { h = 16 * GRID_H; };
+                        class Box : Box { h = 16 * GRID_H; };
                     };
                 };
 
@@ -116,14 +117,8 @@ class A3UE_Coalition_SetupDialog : A3A_SetupDialog
                     class controls : controls
                     {
                         class Label : Label {};
-                        class Background : Background
-                        {
-                            h = 40 * GRID_H;
-                        };
-                        class Box : Box
-                        {
-                            h = 40 * GRID_H;
-                        };
+                        class Background : Background { h = 40 * GRID_H; };
+                        class Box : Box { h = 40 * GRID_H; };
                     };
                 };
             };

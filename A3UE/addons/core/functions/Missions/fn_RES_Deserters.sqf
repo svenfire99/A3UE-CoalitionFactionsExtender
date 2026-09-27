@@ -28,6 +28,56 @@ private _fnc_getIdentityFaction = {
 
     private _identityFaction = _fallbackFaction;
     private _unitType = _unit getVariable ["unitType", ""];
+    private _grp = group _unit;
+
+    private _prefix = _grp getVariable [
+        "Thorne_CoalitionPrefix",
+        ""
+    ];
+
+    if (
+        _prefix == ""
+        && {_unitType != ""}
+        && {(_unitType find "loadouts_riv_") == 0}
+    ) then {
+        _prefix = "riv";
+    };
+
+    private _tag = _grp getVariable [
+        "Thorne_CoalitionTag",
+        ""
+    ];
+
+    if (_prefix == "riv") then {
+        _identityFaction = missionNamespace getVariable [
+            "A3A_faction_riv",
+            _identityFaction
+        ];
+    };
+
+    if (
+        _prefix in ["occ", "inv", "riv"]
+        && {_tag != ""}
+        && {_tag != "BASE"}
+        && {!isNil "Thorne_CoalitionFactions"}
+    ) then {
+        private _pool = Thorne_CoalitionFactions getOrDefault [
+            _prefix,
+            createHashMap
+        ];
+
+        private _tagFaction = _pool getOrDefault [
+            _tag,
+            createHashMap
+        ];
+
+        if (
+            _tagFaction isEqualType createHashMap
+            && {count _tagFaction > 0}
+        ) then {
+            _identityFaction = _tagFaction;
+        };
+    };
 
     if (
         _unitType != ""

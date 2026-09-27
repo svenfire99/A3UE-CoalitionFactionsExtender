@@ -22,6 +22,9 @@ FIX_LINE_NUMBERS()
 params["_mode", "_params"];
 
 Debug_1("Setup dialog called with mode %1", _mode);
+if (_mode == "onLoad") then {
+    diag_log "[Thorne Coalition UI] setupDialog override active";
+};
 
 // Function to give a short time difference string from two serverTimeUTC inputs
 private _fnc_getTimeDiffString = {

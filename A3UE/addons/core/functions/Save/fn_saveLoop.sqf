@@ -1,4 +1,4 @@
-#include "..\..\script_component.hpp"
+#include "\x\A3A\addons\core\script_component.hpp"
 FIX_LINE_NUMBERS()
 if (!isServer) exitWith {
     Error("Miscalled server-only function");
@@ -63,100 +63,66 @@ Debug_1("Saving params: %1", _savedParams);
 ["DLC", A3A_saveData get "DLC"] call A3A_fnc_setStatVariable;
 ["addonVics", A3A_saveData get "addonVics"] call A3A_fnc_setStatVariable;
 
-// -------------------------------------------------------------------------
-// A3UE Coalition persistence
-//
-// Do not save the generated Thorne_CoalitionFactions HashMaps themselves.
-// They contain runtime faction data and can be rebuilt from the selected
-// template config names + paths.
-//
-// Persist only:
-//   - whether coalition mode was enabled in setup
-//   - the extra OCC/INV template entries
-// -------------------------------------------------------------------------
-
-private _coalitionConfig = missionNamespace getVariable [
-    "Thorne_CoalitionConfigNet",
-    A3A_saveData getOrDefault [
-        "Thorne_coalitionConfig",
-        [[], []]
+// A3UE: selector metadata. Keep this next to AU's own selector vars.
+private _thorneCoalitionEnabled = A3A_saveData getOrDefault [
+    "Thorne_coalitionEnabled",
+    missionNamespace getVariable [
+        "Thorne_CoalitionEnabledNet",
+        false
     ]
 ];
 
-if !(
-    _coalitionConfig isEqualType []
-    && {count _coalitionConfig >= 2}
-) then {
-    Error_1(
-        "Invalid Thorne coalition config during save: %1",
-        _coalitionConfig
-    );
-
-    _coalitionConfig = [[], []];
-};
-
-// Prefer the original setup value because "enabled" is meaningful even if
-// the player selected only one faction on each side (no extras).
-private _coalitionEnabled = A3A_saveData getOrDefault [
-    "Thorne_coalitionEnabled",
-    false
+private _thorneCoalitionConfig = A3A_saveData getOrDefault [
+    "Thorne_coalitionConfig",
+    missionNamespace getVariable [
+        "Thorne_CoalitionConfigNet",
+        [[], [], []]
+    ]
 ];
 
-// Keep A3A_saveData in sync too, so later persistent saves in the same
-// mission keep the same selector metadata.
+private _thorneFactionOverrides = A3A_saveData getOrDefault [
+    "Thorne_factionOverrides",
+    missionNamespace getVariable [
+        "Thorne_FactionOverridesNet",
+        [false, false, false]
+    ]
+];
+
 A3A_saveData set [
     "Thorne_coalitionEnabled",
-    _coalitionEnabled
+    _thorneCoalitionEnabled
 ];
 
 A3A_saveData set [
     "Thorne_coalitionConfig",
-    _coalitionConfig
+    _thorneCoalitionConfig
+];
+
+A3A_saveData set [
+    "Thorne_factionOverrides",
+    _thorneFactionOverrides
 ];
 
 [
     "Thorne_coalitionEnabled",
-    _coalitionEnabled
+    _thorneCoalitionEnabled
 ] call A3A_fnc_setStatVariable;
 
 [
     "Thorne_coalitionConfig",
-    _coalitionConfig
+    _thorneCoalitionConfig
 ] call A3A_fnc_setStatVariable;
 
-// Faction-tab override controls are setup metadata, not A3AU Params.
-private _factionOverrideState = A3A_saveData getOrDefault [
-    "Thorne_factionOverrideState",
-    [false, false, false, false]
-];
-
-if !(
-    _factionOverrideState isEqualType []
-    && {count _factionOverrideState >= 4}
-) then {
-    _factionOverrideState = [
-        false,
-        false,
-        false,
-        false
-    ];
-};
-
-A3A_saveData set [
-    "Thorne_factionOverrideState",
-    _factionOverrideState
-];
-
 [
-    "Thorne_factionOverrideState",
-    _factionOverrideState
+    "Thorne_factionOverrides",
+    _thorneFactionOverrides
 ] call A3A_fnc_setStatVariable;
 
 diag_log format [
-    "[Thorne Coalition Save] persistentSave enabled=%1 config=%2 overrides=%3",
-    _coalitionEnabled,
-    _coalitionConfig,
-    _factionOverrideState
+    "[Thorne Save WRITE] enabled=%1 config=%2 overrides=%3",
+    _thorneCoalitionEnabled,
+    _thorneCoalitionConfig,
+    _thorneFactionOverrides
 ];
 
 private ["_garrison"];

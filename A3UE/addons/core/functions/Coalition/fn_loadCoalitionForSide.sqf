@@ -1,44 +1,82 @@
 /*
-    Reads the selection published by the setup GUI.
+    Loads all configured extras for one coalition slot.
 
-    Only:
-        WEST -> occ
-        EAST -> inv
+    Supported selectors:
+        west  -> occ
+        east  -> inv
+        "occ"
+        "inv"
+        "riv"
 
-    Rebels, civilians and rivals are intentionally ignored.
+    Current two-slot GUI remains valid:
+        [OCC, INV]
+
+    Rival-aware GUI later supplies:
+        [OCC, INV, RIV]
 */
-params ["_side"];
 
-if !(_side in [west, east]) exitWith { false };
+params ["_selector"];
 
-private _prefix =
-    if (_side isEqualTo west) then { "occ" } else { "inv" };
+if (isNil "Thorne_CoalitionConfig") then {
+    call Thorne_fnc_initCoalition;
+};
+
+private _prefix = "";
+
+if (_selector isEqualType "") then {
+    if (_selector in ["occ", "inv", "riv"]) then {
+        _prefix = _selector;
+    };
+} else {
+    if (_selector isEqualTo Occupants) then {
+        _prefix = "occ";
+    };
+
+    if (_selector isEqualTo Invaders) then {
+        _prefix = "inv";
+    };
+};
+
+if (_prefix == "") exitWith {
+    diag_log format [
+        "[Thorne Coalition] WARNING loadCoalitionForSide unsupported selector=%1",
+        _selector
+    ];
+    false
+};
 
 private _netConfig = missionNamespace getVariable [
     "Thorne_CoalitionConfigNet",
-    [[], []]
+    [[], [], []]
 ];
 
-if !(_netConfig isEqualType [] && {count _netConfig >= 2}) then {
+if !(_netConfig isEqualType []) then {
     diag_log format [
-        "[Thorne Coalition] WARNING invalid network config: %1",
+        "[Thorne Coalition] WARNING invalid network config type: %1",
         _netConfig
     ];
-    _netConfig = [[], []];
+    _netConfig = [[], [], []];
 };
 
-Thorne_CoalitionConfig set [
-    "occ",
-    _netConfig # 0
+// Backward compatibility with existing [OCC, INV] data.
+private _occ = _netConfig param [0, []];
+private _inv = _netConfig param [1, []];
+private _riv = _netConfig param [2, []];
+
+Thorne_CoalitionConfig set ["occ", _occ];
+Thorne_CoalitionConfig set ["inv", _inv];
+Thorne_CoalitionConfig set ["riv", _riv];
+
+// Reset this slot when a campaign is restarted without restarting Arma.
+Thorne_CoalitionFactions set [
+    _prefix,
+    createHashMap
 ];
 
-Thorne_CoalitionConfig set [
-    "inv",
-    _netConfig # 1
+private _entries = Thorne_CoalitionConfig getOrDefault [
+    _prefix,
+    []
 ];
-
-private _entries =
-    Thorne_CoalitionConfig getOrDefault [_prefix, []];
 
 diag_log format [
     "[Thorne Coalition] selected extras for %1 = %2",
@@ -46,31 +84,39 @@ diag_log format [
     _entries
 ];
 
-{
-    _x params [
-        "_tag",
-        "_file"
-    ];
-
-    [
-        _side,
-        _prefix,
-        _tag,
-        _file
-    ] call Thorne_fnc_loadCoalitionFaction;
-
-} forEach _entries;
-
-
-// ------------------------------------------------------------
-// Merge all vehicle pools into AU's normal faction
-// ------------------------------------------------------------
-
-if (_entries isNotEqualTo []) then {
-
-    [_side] call Thorne_fnc_mergeCoalitionVehicles;
-
+private _loadSide = switch (_prefix) do {
+    case "occ": { Occupants };
+    case "inv": { Invaders };
+    // A3AU's Rival loader verifies/registers against EAST/OPFOR classes.
+    case "riv": { east };
+    default { sideUnknown };
 };
 
+{
+    if (_x isEqualType [] && {count _x >= 2}) then {
+        _x params [
+            "_tag",
+            "_file"
+        ];
+
+        [
+            _loadSide,
+            _prefix,
+            _tag,
+            _file
+        ] call Thorne_fnc_loadCoalitionFaction;
+    } else {
+        diag_log format [
+            "[Thorne Coalition] WARNING malformed %1 coalition entry: %2",
+            _prefix,
+            _x
+        ];
+    };
+} forEach _entries;
+
+// Merge vehicle categories only after all extras are loaded.
+if (_entries isNotEqualTo []) then {
+    [_prefix] call Thorne_fnc_mergeCoalitionVehicles;
+};
 
 true

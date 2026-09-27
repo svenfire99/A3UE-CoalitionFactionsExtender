@@ -1,3 +1,5 @@
+#include "\x\A3A\addons\core\script_component.hpp"
+
 /*
  * File: fn_createUnit.sqf
  * Description:
@@ -15,23 +17,36 @@
  *    _markers - Markers the AI can be placed on: Array
  *    _placement - Placement radius: Number
  *    _special - Unit special placement: String
- *    _identity - optional unit identity parameters, keys may include:
-			- "face"
-			- "speaker"
-			- "pitch"
-			- "firstName"
-			- "lastName"
-			All values of those keys must be strings except for "pitch" which is a number.
-			If _identity parameter is not specified, a random identity will be applied to the unit according to its faction and type.
  * Returns:
  *    Object - created unit
  * Example Usage:
- *    [group, _type, position, markers, placement, special] call A3A_fnc_createUnit
+ *    [group, _type, position, markers, placement, special] call A3A_fnc_RivalsCreateUnit
 */
 
-#include "\x\A3A\addons\core\script_component.hpp"
+params ["_group", "_type", "_position", ["_markers", []], ["_placement", 0], ["_special", "NONE"]];
 
-params ["_group", "_type", "_position", ["_markers", []], ["_placement", 0], ["_special", "NONE"], "_identity"];
+private _requestedType = _type;
+
+_group setVariable [
+    "Thorne_CoalitionPrefix",
+    "riv",
+    false
+];
+
+if ((_group getVariable ["Thorne_CoalitionTag", ""]) == "") then {
+    [
+        _group,
+        "riv",
+        [_type]
+    ] call Thorne_fnc_selectCoalitionForGroup;
+};
+
+_type = [
+    _group,
+    "riv",
+    _type
+] call Thorne_fnc_resolveCoalitionType;
+
 
 private _unitDefinition = A3A_customUnitTypes getVariable [_type, []];
 
@@ -67,33 +82,51 @@ if !(_unitDefinition isEqualTo []) exitWith {
 	private _unit = _group createUnit [_unitClass, _position, _markers, _placement, _special];
     [_unit] joinSilent _group; // normally, this command is literally pointless. But when we're mixing base classes (e.g opfor) but spawning them as blufor (swap enemy sides selection), it'll make them fight each other unless we do this
 
+
     if (_canSkip isEqualTo false) then {
 	    _unit setUnitLoadout selectRandom _loadouts;
     };
 	_unit setVariable ["unitType", _type, true];
+    _unit setVariable ["Thorne_OriginalUnitType", _requestedType, true];
+    _unit setVariable [
+        "Thorne_CoalitionPrefix",
+        "riv",
+        true
+    ];
+    _unit setVariable [
+        "Thorne_CoalitionTag",
+        _group getVariable ["Thorne_CoalitionTag", "BASE"],
+        true
+    ];
 
-	private _identityFaction = Faction(side _unit);
+    // RivalCreateUnit bypasses normal A3A_fnc_createUnit identity creation.
+    // Resolve identity directly from the exact generated coalition type.
+    private _identityFaction = A3A_faction_riv;
 
-	if (!isNil "Thorne_CoalitionTypeFactionMap") then {
-		private _coalitionFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
-			_type,
-			createHashMap
-		];
+    if (!isNil "Thorne_CoalitionTypeFactionMap") then {
+        private _coalitionFaction =
+            Thorne_CoalitionTypeFactionMap getOrDefault [
+                _type,
+                createHashMap
+            ];
 
-		if (
-			_coalitionFaction isEqualType createHashMap
-			&& {count _coalitionFaction > 0}
-		) then {
-			_identityFaction = _coalitionFaction;
-		};
-	};
+        if (
+            _coalitionFaction isEqualType createHashMap
+            && {count _coalitionFaction > 0}
+        ) then {
+            _identityFaction = _coalitionFaction;
+        };
+    };
 
-	private _identity = if (isNil "_identity") then {
-		[_identityFaction, _type] call A3A_fnc_createRandomIdentity;
-	} else {
-		_identity;
-	};
-	[_unit, _identity] call A3A_fnc_setIdentity;
+    private _identity = [
+        _identityFaction,
+        _type
+    ] call A3A_fnc_createRandomIdentity;
+
+    [
+        _unit,
+        _identity
+    ] call A3A_fnc_setIdentity;
 
 	//it's very fragile and non-extensible (adding second bool or string value into template will break this)
 	{
@@ -104,7 +137,7 @@ if !(_unitDefinition isEqualTo []) exitWith {
 			case (_x isEqualType ""): {
 				_unit setVariable ["unitPrefix", _x, true];
 			};
-		};	
+		};
 	} forEach _unitProperties;
 
 	{
@@ -117,4 +150,11 @@ if !(_unitDefinition isEqualTo []) exitWith {
 
 private _unit = _group createUnit [_type, _position, _markers, _placement, _special];
 _unit setVariable ["unitType", _type, true];
+_unit setVariable ["Thorne_OriginalUnitType", _requestedType, true];
+_unit setVariable ["Thorne_CoalitionPrefix", "riv", true];
+_unit setVariable [
+    "Thorne_CoalitionTag",
+    _group getVariable ["Thorne_CoalitionTag", "BASE"],
+    true
+];
 _unit

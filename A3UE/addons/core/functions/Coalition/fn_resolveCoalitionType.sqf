@@ -1,28 +1,73 @@
 /*
-    Convert an ordinary A3AU generated type into the selected coalition alias.
+    Resolves a logical AU loadout type through the faction selected for a group.
 
-    Example:
-      loadouts_occ_military_Rifleman
-    becomes:
-      loadouts_occ_BAF_military_Rifleman
+    Params:
+        GROUP
+        STRING prefix: "occ", "inv", "riv"
+        STRING requested type
+
+    Returns:
+        STRING resolved type. BASE or missing mappings return the original type.
 */
-params ["_type", "_side", "_tag"];
+params [
+    ["_group", grpNull, [grpNull]],
+    ["_prefix", "", [""]],
+    ["_type", "", [""]]
+];
 
-if !(_type isEqualType "") exitWith { "" };
-if (_tag == "") exitWith { "" };
-
-private _prefix = switch (_side) do {
-    case west: { "occ" };
-    case east: { "inv" };
-    default { "" };
+if (
+    isNull _group
+    || {_type == ""}
+    || {!(_prefix in ["occ", "inv", "riv"])}
+) exitWith {
+    _type
 };
-if (_prefix == "") exitWith { "" };
 
-private _normalPrefix = format ["loadouts_%1_", _prefix];
-if ((_type find _normalPrefix) != 0) exitWith { _type };
+private _tag = _group getVariable [
+    "Thorne_CoalitionTag",
+    ""
+];
 
-private _localName = _type select [count _normalPrefix];
-private _key = format ["%1:%2", _prefix, _tag];
-private _map = Thorne_CoalitionUnitTypes getOrDefault [_key, createHashMap];
+if (_tag == "") then {
+    _tag = [
+        _group,
+        _prefix,
+        [_type]
+    ] call Thorne_fnc_selectCoalitionForGroup;
+};
 
-_map getOrDefault [_localName, ""]
+if (_tag == "BASE") exitWith {
+    _type
+};
+
+private _pool = Thorne_CoalitionFactions getOrDefault [
+    _prefix,
+    createHashMap
+];
+
+private _faction = _pool getOrDefault [
+    _tag,
+    createHashMap
+];
+
+private _unitMap = _faction getOrDefault [
+    "Thorne_CoalitionUnitMap",
+    createHashMap
+];
+
+private _resolved = _unitMap getOrDefault [
+    _type,
+    ""
+];
+
+if (_resolved == "") exitWith {
+    diag_log format [
+        "[Thorne Coalition] WARNING no mapping prefix='%1' tag='%2' type='%3'; using BASE type",
+        _prefix,
+        _tag,
+        _type
+    ];
+    _type
+};
+
+_resolved

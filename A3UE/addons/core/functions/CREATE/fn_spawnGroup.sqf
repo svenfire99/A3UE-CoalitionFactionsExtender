@@ -10,7 +10,7 @@
       the normal A3AU faction is used instead.
 */
 
-#include "..\..\script_component.hpp"
+#include "\x\A3A\addons\core\script_component.hpp"
 
 params [
     "_positionX",
@@ -25,10 +25,24 @@ private _groupX = createGroup _sideX;
 // Coalition selection
 // ========================================================================
 
-private _prefix = switch (_sideX) do {
-    case west: { "occ" };
-    case east: { "inv" };
-    default { "" };
+private _prefix = "";
+
+{
+    if (_x isEqualType "") then {
+        if ((_x find "loadouts_riv_") == 0) exitWith { _prefix = "riv"; };
+        if ((_x find "loadouts_occ_") == 0) exitWith { _prefix = "occ"; };
+        if ((_x find "loadouts_inv_") == 0) exitWith { _prefix = "inv"; };
+    };
+} forEach _typesX;
+
+if (_prefix == "") then {
+    if (_sideX isEqualTo Occupants) then {
+        _prefix = "occ";
+    } else {
+        if (_sideX isEqualTo Invaders) then {
+            _prefix = "inv";
+        };
+    };
 };
 
 private _selectedTag = "";
@@ -184,7 +198,13 @@ if (
     };
 
 
-    // Store useful debug metadata on the group.
+    // Store coalition role + selected faction on the group.
+    _groupX setVariable [
+        "Thorne_CoalitionPrefix",
+        _prefix,
+        false
+    ];
+
     _groupX setVariable [
         "Thorne_CoalitionTag",
         _selectedTag,
@@ -294,46 +314,41 @@ for "_i" from 0 to (_countX - 1) do {
         // Leader
         // ---------------------------------------------------------------
 
-        private _currentFaction = switch (_sideX) do {
-            case west: {
+        private _leaderFaction = switch (_prefix) do {
+            case "occ": {
                 missionNamespace getVariable [
                     "A3A_faction_occ",
                     createHashMap
                 ]
             };
 
-            case east: {
+            case "inv": {
                 missionNamespace getVariable [
                     "A3A_faction_inv",
                     createHashMap
                 ]
             };
 
-            case independent: {
+            case "riv": {
                 missionNamespace getVariable [
-                    "A3A_faction_reb",
-                    createHashMap
-                ]
-            };
-
-            case civilian: {
-                missionNamespace getVariable [
-                    "A3A_faction_civ",
+                    "A3A_faction_riv",
                     createHashMap
                 ]
             };
 
             default {
-                createHashMap
+                Faction(_sideX)
             };
         };
 
-        private _squadLeaders = _currentFaction getOrDefault [
-            "SquadLeaders",
-            []
-        ];
-
-        if (_originalType in _squadLeaders) then {
+        if (
+            _originalType in (
+                _leaderFaction getOrDefault [
+                    "SquadLeaders",
+                    []
+                ]
+            )
+        ) then {
             _groupX selectLeader _unit;
         };
 

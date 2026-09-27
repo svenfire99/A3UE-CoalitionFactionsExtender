@@ -22,87 +22,39 @@ private _type = _unit getVariable "unitType";
 private _side = side (group _unit);
 private _isRival = _unit getVariable ["isRival", false];
 private _unitPrefix = _unit getVariable ["unitPrefix", ""];
-
-
-// Default AU faction
 private _faction = Faction(_side);
+private _thorneCoalitionFactionFound = false;
+
+// Coalition aliases are registered with an exact type -> faction map.
+// This does not care whether Occupants/Invaders are WEST/EAST, so
+// "Switch enemy sides" cannot change the identity result.
+if (!isNil "Thorne_CoalitionTypeFactionMap" && {!isNil "_type"}) then {
+    private _coalitionFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
+        _type,
+        createHashMap
+    ];
+
+    if (
+        _coalitionFaction isEqualType createHashMap
+        && {count _coalitionFaction > 0}
+    ) then {
+        _faction = _coalitionFaction;
+        _thorneCoalitionFactionFound = true;
+
+        diag_log format [
+            "[Thorne Coalition Identity] NATOinit type='%1' faction='%2' side=%3",
+            _type,
+            _faction getOrDefault ["name", "UNKNOWN"],
+            _side
+        ];
+    };
+};
 
 _unit setVariable ["originalSide", _side];          // used for delete handler, which is local
 
 if (isNil "_type") then {
     Warning_2("Unit does not have a type assigned: %1, vehicle: %2", typeOf _unit, typeOf vehicle _unit);
     _type = typeOf _unit;
-};
-
-// ------------------------------------------------------------
-// Thorne Coalition faction resolution
-// ------------------------------------------------------------
-// Prefer the faction tag selected by spawnGroup. Fall back to the
-// unitType -> faction map for coalition units created through another path.
-if (!_isRival) then {
-    private _coalitionTag = (group _unit) getVariable [
-        "Thorne_CoalitionTag",
-        ""
-    ];
-
-    private _prefix = switch (_side) do {
-        case west: { "occ" };
-        case east: { "inv" };
-        default { "" };
-    };
-
-    if (
-        _prefix != ""
-        && {_coalitionTag != ""}
-        && {_coalitionTag != "BASE"}
-        && {!isNil "Thorne_CoalitionFactions"}
-    ) then {
-        private _sidePool = Thorne_CoalitionFactions getOrDefault [
-            _prefix,
-            createHashMap
-        ];
-
-        private _coalitionFaction = _sidePool getOrDefault [
-            _coalitionTag,
-            createHashMap
-        ];
-
-        if (
-            _coalitionFaction isEqualType createHashMap
-            && {count _coalitionFaction > 0}
-        ) then {
-            _faction = _coalitionFaction;
-        };
-    };
-
-    // Redundant fallback.
-    if (
-        _faction isEqualTo Faction(_side)
-        && {_type isEqualType ""}
-        && {_type isNotEqualTo ""}
-        && {!isNil "Thorne_CoalitionTypeFactionMap"}
-    ) then {
-        private _coalitionFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
-            _type,
-            createHashMap
-        ];
-
-        if (
-            _coalitionFaction isEqualType createHashMap
-            && {count _coalitionFaction > 0}
-        ) then {
-            _faction = _coalitionFaction;
-        };
-    };
-
-    if (_coalitionTag != "" && {_coalitionTag != "BASE"}) then {
-        diag_log format [
-            "[Thorne Coalition Identity] NATOinit tag='%1' type='%2' faction='%3'",
-            _coalitionTag,
-            _type,
-            _faction getOrDefault ["name", "UNKNOWN"]
-        ];
-    };
 };
 
 if (_type == "Fin_random_F") exitWith {};
@@ -168,74 +120,62 @@ _unit addEventHandler ["Deleted", A3A_fnc_enemyUnitDeletedEH];
 
 //Calculates the skill of the given unit
 private _skill = (0.1 * A3A_enemySkillMul) + (0.07 * (1 max A3A_activePlayerCount^0.5)) + (0.01 * tierWar);
-private _regularFaces = [];
-private _regularVoices = [];
-private _regularInsignia = [];
-private _face = "";
-private _voice = "";
-private _insignia = "";
+private _regularFaces = nil;
+private _regularVoices = nil;
+private _regularInsignia = nil;
+private _face = nil;
+private _voice = nil;
+private _insignia = nil;
 
-private _fnc_pickIdentityValue = {
-    params ["_values", ["_fallback", ""]];
-
-    if (
-        _values isEqualType []
-        && {_values isNotEqualTo []}
-    ) exitWith {
-        selectRandom _values
-    };
-
-    _fallback
-};
-
-if (_isRival) then {
-    _regularFaces = A3A_faction_riv getOrDefault ["faces", []];
-    _regularVoices = A3A_faction_riv getOrDefault ["voices", []];
-    _regularInsignia = A3A_faction_riv getOrDefault ["insignia", []];
+if (_isRival && {!_thorneCoalitionFactionFound}) then {
+    _regularFaces = A3A_faction_riv get "faces";
+    _regularVoices = A3A_faction_riv get "voices";
+    _regularInsignia = A3A_faction_riv get "insignia";
 } else {
-    _regularFaces = _faction getOrDefault ["faces", []];
-    _regularVoices = _faction getOrDefault ["voices", []];
-    _regularInsignia = _faction getOrDefault ["insignia", []];
+    _regularFaces = _faction get "faces";
+    _regularVoices = _faction get "voices";
+    _regularInsignia = _faction get "insignia";
 };
 
 switch (true) do {
     case (_isRival): {
         _skill = _skill * 0.9;
-        _face = [A3A_faction_riv getOrDefault ["faces", []]] call _fnc_pickIdentityValue;
-        _voice = [A3A_faction_riv getOrDefault ["voices", []]] call _fnc_pickIdentityValue;
+        _face = selectRandom _regularFaces;
+        _voice = selectRandom _regularVoices;
+        _insignia = selectRandom _regularInsignia;
     };
     case (_unitPrefix isEqualTo "militia"): {
         _skill = _skill * 0.7;
-        _face = [_faction getOrDefault ["milFaces", _regularFaces]] call _fnc_pickIdentityValue;
-        _voice = [_faction getOrDefault ["milVoices", _regularVoices]] call _fnc_pickIdentityValue;
-        _insignia = [_faction getOrDefault ["milInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
+        _face = selectRandom (_faction getOrDefault ["milFaces", _regularFaces]);
+        _voice = selectRandom (_faction getOrDefault ["milVoices", _regularVoices]);
+        _insignia = selectRandom (_faction getOrDefault ["milInsignia", _regularInsignia]);
     };
     case (_unitPrefix isEqualTo "police"): {
         _skill = _skill * 0.5;
-        _face = [_faction getOrDefault ["polFaces", _regularFaces]] call _fnc_pickIdentityValue;
-        _voice = [_faction getOrDefault ["polVoices", _regularVoices]] call _fnc_pickIdentityValue;
-        _insignia = [_faction getOrDefault ["polInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
+        _face = selectRandom (_faction getOrDefault ["polFaces", _regularFaces]);
+        _voice = selectRandom (_faction getOrDefault ["polVoices", _regularVoices]);
+        _insignia = selectRandom (_faction getOrDefault ["polInsignia", _regularInsignia]);
     };
     case (_unitPrefix isEqualTo "elite"): {
         _skill = _skill * 1.1;
-        _face = [_faction getOrDefault ["eliteFaces", _regularFaces]] call _fnc_pickIdentityValue;
-        _voice = [_faction getOrDefault ["eliteVoices", _regularVoices]] call _fnc_pickIdentityValue;
-        _insignia = [_faction getOrDefault ["eliteInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
+        _face = selectRandom (_faction getOrDefault ["eliteFaces", _regularFaces]);
+        _voice = selectRandom (_faction getOrDefault ["eliteVoices", _regularVoices]);
+        _insignia = selectRandom (_faction getOrDefault ["eliteInsignia", _regularInsignia]);
     };
     case (_unitPrefix isEqualTo "SF"): {
         _skill = _skill * 1.2;
-        _face = [_faction getOrDefault ["sfFaces", _regularFaces]] call _fnc_pickIdentityValue;
-        _voice = [_faction getOrDefault ["sfVoices", _regularVoices]] call _fnc_pickIdentityValue;
-        _insignia = [_faction getOrDefault ["sfInsignia", _regularInsignia]] call _fnc_pickIdentityValue;
+        _face = selectRandom (_faction getOrDefault ["sfFaces", _regularFaces]);
+        _voice = selectRandom (_faction getOrDefault ["sfVoices", _regularVoices]);
+        _insignia = selectRandom (_faction getOrDefault ["sfInsignia", _regularInsignia]);
     };
     case ("Traitor" in _type): {
-        _face = [A3A_faction_reb getOrDefault ["faces", []]] call _fnc_pickIdentityValue;
+        _face = selectRandom (A3A_faction_reb get "faces");
         _voice = "NoVoice";
     };
     default {
-        _face = [_regularFaces] call _fnc_pickIdentityValue;
-        _voice = [_regularVoices] call _fnc_pickIdentityValue;
-        _insignia = [_regularInsignia] call _fnc_pickIdentityValue;
+        _face = selectRandom _regularFaces;
+        _voice = selectRandom _regularVoices;
+        _insignia = selectRandom _regularInsignia;
     };
 };
 [_unit, createHashMapFromArray [["face", _face], ["speaker", _voice], ["pitch", (random [0.9, 1, 1.1])]]] call A3A_fnc_setIdentity;
@@ -245,7 +185,7 @@ if (!isNil "_insignia" && {_insignia isNotEqualTo ""}) then {
 };
 
 //Adjusts squadleaders with improved skill
-if (_type in (_faction getOrDefault ["SquadLeaders", []])) then {
+if (_type in FactionGet(all,"SquadLeaders")) then {
     _unit setskill ["courage",_skill + 0.2];
     _unit setskill ["commanding",_skill + 0.2];
 

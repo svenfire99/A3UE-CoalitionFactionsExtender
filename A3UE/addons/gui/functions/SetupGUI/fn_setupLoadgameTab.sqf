@@ -49,12 +49,8 @@ switch (_mode) do
     case ("onLoad"):
     {
         _display setVariable ["savedFactions", [[], [], []]];
-        _display setVariable ["savedCoalition", [false, [[], [], []]]];
         _display setVariable ["savedParams", []];
-        _display setVariable [
-            "savedFactionOverrideState",
-            [false, false, false, false]
-        ];
+        _display setVariable ["savedFactionOverrides", [false, false, false]];
         _listboxCtrl setVariable ["rowIndex", -1];
 
         private _platformIsWindows = A3A_setup_platform isEqualTo "Windows";
@@ -95,226 +91,105 @@ switch (_mode) do
         (_display displayCtrl A3A_IDC_SETUP_NAMESPACETEXT) ctrlShow _newGame;
         (_display displayCtrl A3A_IDC_SETUP_HQPOSBUTTON) ctrlShow (_newGame && !cbChecked _copyGameCtrl);
 
-        // If we're selecting a game to load, load factions if available.
+        // If we're selecting a game to load, load factions if available
         private _factions = [_saveData get "factions", _saveData get "addonVics", _saveData get "DLC"];
         if (isNil {_factions#0}) then { _factions = [[], [], []] };
+        if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then { _factions = [[], [], []] };
 
-        private _loadingExistingSetup =
-            _sameMap
-            && {
-                !cbChecked _newGameCtrl
-                || {cbChecked _copyGameCtrl}
-            };
-
-        if (!_loadingExistingSetup) then {
-            _factions = [[], [], []];
-        };
-
-        // -----------------------------------------------------------------
-        // Thorne coalition persistence
-        //
-        // Old saves do not contain these fields, so they cleanly fall back
-        // to coalition disabled with no extra factions.
-        // -----------------------------------------------------------------
-        private _coalitionEnabled = false;
-        private _coalitionConfig = [[], [], []];
-
-        if (_loadingExistingSetup) then {
-            _coalitionEnabled = _saveData getOrDefault [
-                "Thorne_coalitionEnabled",
-                false
-            ];
-
-            _coalitionConfig = _saveData getOrDefault [
-                "Thorne_coalitionConfig",
-                [[], []]
-            ];
-
-            if !(
-                _coalitionConfig isEqualType []
-                && {count _coalitionConfig >= 2}
-            ) then {
-                diag_log format [
-                    "[Thorne Coalition Save] WARNING invalid saved coalition config: %1",
-                    _coalitionConfig
-                ];
-                _coalitionConfig = [[], [], []];
-            };
-
-            if ((count _coalitionConfig) < 3) then {
-                _coalitionConfig pushBack [];
-            };
-        };
-
-        private _coalitionState = [
-            _coalitionEnabled,
-            _coalitionConfig
-        ];
-
-        private _factionsChanged =
-            _factions isNotEqualTo (_display getVariable "savedFactions");
-
-        private _coalitionChanged =
-            _coalitionState isNotEqualTo (
-                _display getVariable [
-                    "savedCoalition",
-                    [false, [[], [], []]]
-                ]
-            );
-
-        if (_coalitionChanged) then {
-            _display setVariable [
-                "savedCoalition",
-                _coalitionState
-            ];
-
-            missionNamespace setVariable [
-                "Thorne_CoalitionConfigNet",
-                _coalitionConfig,
-                true
-            ];
-
-            private _coalitionCheck =
-                _display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK;
-
-            _coalitionCheck cbSetChecked _coalitionEnabled;
-
-            // Prepare selected config-name arrays BEFORE fillFactions.
-            if (
-                _coalitionEnabled
-                && {count (_factions param [0, []]) >= 5}
-            ) then {
-                private _savedFactionIDs = _factions # 0;
-
-                private _occMain = _savedFactionIDs # 0;
-                private _invMain = _savedFactionIDs # 1;
-                private _rivMain = _savedFactionIDs # 4;
-
-                private _occSelected = [_occMain];
-                private _invSelected = [_invMain];
-                private _rivSelected = [_rivMain];
-
-                {
-                    if (_x isEqualType [] && {count _x > 0}) then {
-                        _occSelected pushBackUnique (_x # 0);
-                    };
-                } forEach (_coalitionConfig param [0, []]);
-
-                {
-                    if (_x isEqualType [] && {count _x > 0}) then {
-                        _invSelected pushBackUnique (_x # 0);
-                    };
-                } forEach (_coalitionConfig param [1, []]);
-
-                {
-                    if (_x isEqualType [] && {count _x > 0}) then {
-                        _rivSelected pushBackUnique (_x # 0);
-                    };
-                } forEach (_coalitionConfig param [2, []]);
-
-                _display setVariable ["Thorne_occSelections", _occSelected];
-                _display setVariable ["Thorne_invSelections", _invSelected];
-                _display setVariable ["Thorne_rivSelections", _rivSelected];
-
-                private _occCtrl =
-                    _display displayCtrl A3A_IDC_SETUP_OCCUPANTSLISTBOX;
-                private _invCtrl =
-                    _display displayCtrl A3A_IDC_SETUP_INVADERSLISTBOX;
-                private _rivCtrl =
-                    _display displayCtrl A3A_IDC_SETUP_RIVALSLISTBOX;
-
-                _occCtrl setVariable ["Thorne_primaryFaction", _occMain];
-                _invCtrl setVariable ["Thorne_primaryFaction", _invMain];
-                _rivCtrl setVariable ["Thorne_primaryFaction", _rivMain];
-
-                diag_log format [
-                    "[Thorne Coalition Save] prepared restore enabled=true OCC=%1 INV=%2 RIV=%3",
-                    _occSelected,
-                    _invSelected,
-                    _rivSelected
-                ];
-            } else {
-                _display setVariable ["Thorne_occSelections", []];
-                _display setVariable ["Thorne_invSelections", []];
-                _display setVariable ["Thorne_rivSelections", []];
-
-                if (_loadingExistingSetup) then {
-                    diag_log "[Thorne Coalition Save] loaded save with coalition disabled";
-                };
-            };
-        };
-
-        // -----------------------------------------------------------------
-        // A3UE: restore setup-only faction filter overrides.
-        // These controls are not normal gameplay Params.
-        //
-        // #0 Override/Ignore Camo Limits
-        // #1 Switch Enemy Sides
-        // #2 Override Side Limits / Any Enemy
-        // #3 Show Missing Factions
-        // -----------------------------------------------------------------
-        private _overrideState = [
-            false,
-            false,
-            false,
+        private _coalitionEnabled = _saveData getOrDefault [
+            "Thorne_coalitionEnabled",
             false
         ];
 
-        if (_loadingExistingSetup) then {
-            _overrideState = _saveData getOrDefault [
-                "Thorne_factionOverrideState",
-                [false, false, false, false]
-            ];
+        private _coalitionConfig = _saveData getOrDefault [
+            "Thorne_coalitionConfig",
+            [[], [], []]
+        ];
 
-            if !(
-                _overrideState isEqualType []
-                && {count _overrideState >= 4}
-            ) then {
-                _overrideState = [
-                    false,
-                    false,
-                    false,
-                    false
-                ];
-            };
+        if !(_coalitionConfig isEqualType []) then {
+            _coalitionConfig = [[], [], []];
         };
 
-        private _overrideChanged =
-            _overrideState isNotEqualTo (
+        if ((count _coalitionConfig) < 3) then {
+            _coalitionConfig pushBack [];
+        };
+
+        if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then {
+            _coalitionEnabled = false;
+            _coalitionConfig = [[], [], []];
+        };
+
+        (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK)
+            cbSetChecked _coalitionEnabled;
+
+        missionNamespace setVariable [
+            "Thorne_CoalitionConfigNet",
+            _coalitionConfig,
+            true
+        ];
+
+        // A3UE selector metadata, restored BEFORE AU rebuilds the lists.
+        private _factionOverrides = _saveData getOrDefault [
+            "Thorne_factionOverrides",
+            [false, false, false]
+        ];
+
+        if !(
+            _factionOverrides isEqualType []
+            && {count _factionOverrides >= 3}
+        ) then {
+            _factionOverrides = [
+                false,
+                false,
+                false
+            ];
+        };
+
+        if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then {
+            _factionOverrides = [
+                false,
+                false,
+                false
+            ];
+        };
+
+        private _overridesChanged =
+            _factionOverrides isNotEqualTo (
                 _display getVariable [
-                    "savedFactionOverrideState",
-                    [false, false, false, false]
+                    "savedFactionOverrides",
+                    [false, false, false]
                 ]
             );
 
-        if (_overrideChanged) then {
+        if (_overridesChanged) then {
+            [
+                _display,
+                _factionOverrides
+            ] call Thorne_fnc_applyFactionOverrides;
+
             _display setVariable [
-                "savedFactionOverrideState",
-                +_overrideState
+                "savedFactionOverrides",
+                +_factionOverrides
             ];
 
-            (_display displayCtrl A3A_IDC_SETUP_IGNORECAMOCHECK)
-                cbSetChecked (_overrideState # 0);
-
-            (_display displayCtrl A3A_IDC_SETUP_SWITCHENEMYCHECK)
-                cbSetChecked (_overrideState # 1);
-
-            (_display displayCtrl A3A_IDC_SETUP_ANYENEMYCHECK)
-                cbSetChecked (_overrideState # 2);
-
-            (_display displayCtrl A3A_IDC_SETUP_SHOWMISSINGCHECK)
-                cbSetChecked (_overrideState # 3);
+            missionNamespace setVariable [
+                "Thorne_FactionOverridesNet",
+                +_factionOverrides,
+                true
+            ];
 
             diag_log format [
-                "[Thorne Coalition Save] restored faction overrides camo=%1 switchSides=%2 anyEnemy=%3 showMissing=%4",
-                _overrideState # 0,
-                _overrideState # 1,
-                _overrideState # 2,
-                _overrideState # 3
+                "[Thorne Coalition Save] restored faction overrides switch=%1 sideLimits=%2 camo=%3",
+                _factionOverrides # 0,
+                _factionOverrides # 1,
+                _factionOverrides # 2
             ];
         };
 
-        if (_factionsChanged || _coalitionChanged || _overrideChanged) then {
+        if (
+            _factions isNotEqualTo (_display getVariable "savedFactions")
+            || {_overridesChanged}
+        ) then {
             _display setVariable ["savedFactions", _factions];
             ["fillFactions"] call A3A_fnc_setupFactionsTab;
             ["fillContent"] call A3A_fnc_setupFactionsTab;
@@ -440,45 +315,20 @@ switch (_mode) do
         _saveData set ["addonVics", _contentData#0];
         _saveData set ["DLC", _contentData#1];
 
-        // -----------------------------------------------------------------
-        // Persist Thorne coalition setup alongside AU's normal five factions.
-        //
-        // setupFactionsTab/getFactions has already refreshed
-        // Thorne_CoalitionConfigNet at this point.
-        // -----------------------------------------------------------------
-        private _coalitionEnabled =
-            cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
+        // A3UE selector metadata. This follows AU's own pattern:
+        // put it into A3A_saveData at start, then saveLoop persists it.
+        private _coalitionEnabled = missionNamespace getVariable [
+            "Thorne_CoalitionEnabledNet",
+            cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK)
+        ];
 
-        private _coalitionData = missionNamespace getVariable [
+        private _coalitionConfig = missionNamespace getVariable [
             "Thorne_CoalitionConfigNet",
             [[], [], []]
         ];
 
-        if !(
-            _coalitionData isEqualType []
-            && {count _coalitionData >= 2}
-        ) then {
-            diag_log format [
-                "[Thorne Coalition Save] WARNING invalid runtime coalition config: %1",
-                _coalitionData
-            ];
-            _coalitionData = [[], [], []];
-        };
-
-        if ((count _coalitionData) < 3) then {
-            _coalitionData pushBack [];
-        };
-
-        // If coalition mode is disabled, never carry old/stale extra factions
-        // into a newly created or edited save.
-        if (!_coalitionEnabled) then {
-            _coalitionData = [[], [], []];
-
-            missionNamespace setVariable [
-                "Thorne_CoalitionConfigNet",
-                _coalitionData,
-                true
-            ];
+        if ((count _coalitionConfig) < 3) then {
+            _coalitionConfig pushBack [];
         };
 
         _saveData set [
@@ -488,34 +338,30 @@ switch (_mode) do
 
         _saveData set [
             "Thorne_coalitionConfig",
-            _coalitionData
+            _coalitionConfig
         ];
 
-        private _factionOverrideState = [
-            cbChecked (
-                _display displayCtrl A3A_IDC_SETUP_IGNORECAMOCHECK
-            ),
-            cbChecked (
-                _display displayCtrl A3A_IDC_SETUP_SWITCHENEMYCHECK
-            ),
-            cbChecked (
-                _display displayCtrl A3A_IDC_SETUP_ANYENEMYCHECK
-            ),
-            cbChecked (
-                _display displayCtrl A3A_IDC_SETUP_SHOWMISSINGCHECK
-            )
-        ];
+        private _factionOverrides = [
+            _display
+        ] call Thorne_fnc_getFactionOverrides;
 
         _saveData set [
-            "Thorne_factionOverrideState",
-            _factionOverrideState
+            "Thorne_factionOverrides",
+            _factionOverrides
+        ];
+
+        missionNamespace setVariable [
+            "Thorne_FactionOverridesNet",
+            +_factionOverrides,
+            true
         ];
 
         diag_log format [
-            "[Thorne Coalition Save] saving enabled=%1 config=%2 overrides=%3",
+            "[Thorne Coalition Save] setup save enabled=%1 factions=%2 config=%3 overrides=%4",
             _coalitionEnabled,
-            _coalitionData,
-            _factionOverrideState
+            _factions,
+            _coalitionConfig,
+            _factionOverrides
         ];
 
         private _invEnabled = ctrlEnabled A3A_IDC_SETUP_INVADERSLISTBOX;
@@ -673,11 +519,6 @@ switch (_mode) do
 
         } forEach _invExtras;
 
-
-        // ------------------------------------------------------------
-        // Build RIV list
-        // ------------------------------------------------------------
-
         private _rivNames = [
             _rivalName
         ];
@@ -688,11 +529,9 @@ switch (_mode) do
                 ["_templatePath", ""]
             ];
 
-            private _displayName = [
-                _configName
-            ] call _fnc_getFactionDisplayName;
-
-            _rivNames pushBackUnique _displayName;
+            _rivNames pushBackUnique (
+                [_configName] call _fnc_getFactionDisplayName
+            );
 
         } forEach _rivExtras;
 

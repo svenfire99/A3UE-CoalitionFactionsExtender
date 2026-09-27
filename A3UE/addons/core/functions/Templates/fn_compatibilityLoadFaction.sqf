@@ -5,7 +5,7 @@
     coalition factions for WEST/OCC and EAST/INV under unique unit aliases.
 */
 
-#include "..\..\script_component.hpp"
+#include "\x\A3A\addons\core\script_component.hpp"
 FIX_LINE_NUMBERS()
 
 params ["_file", "_side"];
@@ -16,30 +16,36 @@ Info_2(
     _side
 );
 
-private _sideIndex = [west, east, independent, civilian] find _side;
+private _defaultName = "EnemyDefaults";
+private _factionPrefix = "";
 
-if (_sideIndex < 0) exitWith {
-    diag_log format [
-        "[Thorne Coalition] ERROR compatibilityLoadFaction invalid side: %1",
-        _side
-    ];
-
-    createHashMap
+if (_side isEqualTo Occupants) then {
+    _factionPrefix = "occ";
+} else {
+    if (_side isEqualTo Invaders) then {
+        _factionPrefix = "inv";
+    } else {
+        if (_side isEqualTo independent) then {
+            _factionPrefix = "reb";
+            _defaultName = "RebelDefaults";
+        } else {
+            if (_side isEqualTo civilian) then {
+                _factionPrefix = "civ";
+                _defaultName = "CivilianDefaults";
+            };
+        };
+    };
 };
 
-private _defaultName = [
-    "EnemyDefaults",
-    "EnemyDefaults",
-    "RebelDefaults",
-    "CivilianDefaults"
-] select _sideIndex;
-
-private _factionPrefix = [
-    "occ",
-    "inv",
-    "reb",
-    "civ"
-] select _sideIndex;
+if (_factionPrefix == "") exitWith {
+    diag_log format [
+        "[Thorne Coalition] ERROR compatibilityLoadFaction unmapped side=%1 occupants=%2 invaders=%3",
+        _side,
+        Occupants,
+        Invaders
+    ];
+    createHashMap
+};
 
 private _factionDefaultFile = format [
     "\x\A3A\addons\core\Templates\Templates\FactionDefaults\%1.sqf",
@@ -94,17 +100,11 @@ private _allDefinitions = _faction get "loadouts";
     [_faction, _side, _file] call A3A_fnc_TV_verifyAssets;
 #endif
 
-if (_side in [west, east]) then {
+if (_side in [Occupants, Invaders]) then {
     private _lightArmedTroop = (_faction get "vehiclesLightArmed") select {
-        ([_x, true] call BIS_fnc_crewCount)
-        - ([_x, false] call BIS_fnc_crewCount)
-        >= 4
+        ([_x, true] call BIS_fnc_crewCount) - ([_x, false] call BIS_fnc_crewCount) >= 4
     };
-
-    _faction set [
-        "vehiclesLightArmedTroop",
-        _lightArmedTroop
-    ];
+    _faction set ["vehiclesLightArmedTroop", _lightArmedTroop];
 
     private _vehArmor =
         (_faction getOrDefault ["vehiclesTanks", [], true])
@@ -116,46 +116,16 @@ if (_side in [west, east]) then {
         + (_faction getOrDefault ["vehiclesAirborne", [], true])
         + (_faction getOrDefault ["vehiclesIFVs", [], true]);
 
-    _faction set [
-        "vehiclesArmor",
-        _vehArmor
-    ];
+    _faction set ["vehiclesArmor", _vehArmor];
 };
 
-// -------------------------------------------------------------------------
-// Thorne Coalition
-// ONLY the main Occupier (WEST) and Invader (EAST) factions participate.
-// Rebels, civilians and rivals must never be touched here.
-// -------------------------------------------------------------------------
-
+// Load the optional extra normal AU factions after the base faction is ready.
+// Only do it for enemy sides.
 if (_factionPrefix in ["occ", "inv"]) then {
-
     if (isNil "Thorne_CoalitionConfig") then {
-        if (!isNil "Thorne_fnc_initCoalition") then {
-            call Thorne_fnc_initCoalition;
-        } else {
-            diag_log "[Thorne Coalition] ERROR: Thorne_fnc_initCoalition is not registered";
-        };
+        call Thorne_fnc_initCoalition;
     };
-
-    if (!isNil "Thorne_fnc_loadCoalitionForSide") then {
-
-        diag_log format [
-            "[Thorne Coalition] Loading coalition pool for prefix=%1 side=%2",
-            _factionPrefix,
-            _side
-        ];
-
-        [_side] call Thorne_fnc_loadCoalitionForSide;
-
-    } else {
-
-        diag_log format [
-            "[Thorne Coalition] ERROR: Thorne_fnc_loadCoalitionForSide is not registered. prefix=%1 side=%2",
-            _factionPrefix,
-            _side
-        ];
-    };
+    [_factionPrefix] call Thorne_fnc_loadCoalitionForSide;
 };
 
 _faction

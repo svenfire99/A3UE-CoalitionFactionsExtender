@@ -19,75 +19,6 @@ params ["_unit", "_identity"];           // Don't care about the other params he
 
 if (isNull _unit) exitWith {};
 
-if (isNil "_identity" || {!(_identity isEqualType createHashMap)}) then {
-    _identity = createHashMap;
-};
-
-
-// Resolve coalition faction from the group tag first.
-// spawnGroup sets Thorne_CoalitionTag on the group BEFORE createUnit is called,
-// so this works even before the unit itself receives its debug tag.
-private _fnc_resolveThorneFaction = {
-    params ["_unit", "_fallbackFaction", ["_type", ""]];
-
-    private _resolvedFaction = _fallbackFaction;
-    private _grp = group _unit;
-    private _tag = if (isNull _grp) then { "" } else {
-        _grp getVariable ["Thorne_CoalitionTag", ""]
-    };
-
-    private _prefix = switch (side _grp) do {
-        case west: { "occ" };
-        case east: { "inv" };
-        default { "" };
-    };
-
-    if (
-        _prefix != ""
-        && {_tag != ""}
-        && {_tag != "BASE"}
-        && {!isNil "Thorne_CoalitionFactions"}
-    ) then {
-        private _sidePool = Thorne_CoalitionFactions getOrDefault [
-            _prefix,
-            createHashMap
-        ];
-
-        private _tagFaction = _sidePool getOrDefault [
-            _tag,
-            createHashMap
-        ];
-
-        if (
-            _tagFaction isEqualType createHashMap
-            && {count _tagFaction > 0}
-        ) then {
-            _resolvedFaction = _tagFaction;
-        };
-    };
-
-    // Redundant fallback for coalition types created outside spawnGroup.
-    if (
-        _resolvedFaction isEqualTo _fallbackFaction
-        && {_type != ""}
-        && {!isNil "Thorne_CoalitionTypeFactionMap"}
-    ) then {
-        private _typeFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
-            _type,
-            createHashMap
-        ];
-
-        if (
-            _typeFaction isEqualType createHashMap
-            && {count _typeFaction > 0}
-        ) then {
-            _resolvedFaction = _typeFaction;
-        };
-    };
-
-    _resolvedFaction
-};
-
 private _firstName = _identity getOrDefault ["firstName", ""];
 private _lastName = _identity getOrDefault ["lastName", ""];
 
@@ -98,38 +29,27 @@ if ((isNil "_firstName" || {_firstName isEqualTo ""}) || (isNil "_lastName" || {
 
     private _type = _unit getVariable ["unitType", ""]; // Why do some units *not* have this set? I will never know!
 
-    private _identityFaction = [
-        _unit,
-        Faction(side _unit),
-        _type
-    ] call _fnc_resolveThorneFaction;
+    private _identityFaction = Faction(side _unit);
 
-    private _randomIdentity = [
-        _identityFaction,
-        _type
-    ] call A3A_fnc_createRandomIdentity;
+    if (!isNil "Thorne_CoalitionTypeFactionMap") then {
+        private _coalitionFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
+            _type,
+            createHashMap
+        ];
 
+        if (
+            _coalitionFaction isEqualType createHashMap
+            && {count _coalitionFaction > 0}
+        ) then {
+            _identityFaction = _coalitionFaction;
+        };
+    };
 
-    _firstName = (
-        [
-            _randomIdentity getOrDefault ["firstName", ""],
-            selectRandom _firstNames
-        ]
-        select {
-            _x != ""
-        }
-    ) # 0;
+    private _identity = [_identityFaction, _type] call A3A_fnc_createRandomIdentity;
 
-
-    _lastName = (
-        [
-            _randomIdentity getOrDefault ["lastName", ""],
-            selectRandom _lastNames
-        ]
-        select {
-            _x != ""
-        }
-    ) # 0;
+    // Choose appropriate faction identity if possible, fallback to default names if unavailable
+    _firstName = ([_identity getOrDefault ["firstName", ""], selectRandom _firstNames] select {_x != ""}) # 0;
+    _lastName = ([_identity getOrDefault ["lastName", ""], selectRandom _lastNames] select {_x != ""}) # 0;
 };
 
 _identity set ["firstName", _firstName];
