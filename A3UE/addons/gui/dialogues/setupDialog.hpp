@@ -40,9 +40,13 @@ class A3UE_Coalition_SetupDialog : A3A_SetupDialog
                     style = 32;
                 };
 
-                // Rivals stay normal single-select.
                 class RivalsLabel : RivalsLabel {};
-                class RivalsListBox : RivalsListBox {};
+
+                // Rivals use the same native LB_MULTI selection as OCC/INV.
+                class RivalsListBox : RivalsListBox
+                {
+                    style = 32;
+                };
 
                 // Add one extra checkbox below the existing four override rows.
                 class ModifiersGroup : ModifiersGroup

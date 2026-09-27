@@ -1,4 +1,4 @@
-#include "\x\A3A\addons\core\script_component.hpp" // This is purely to keep the save with the correct Version Number for AU itself.
+#include "..\..\script_component.hpp"
 FIX_LINE_NUMBERS()
 if (!isServer) exitWith {
     Error("Miscalled server-only function");
@@ -124,10 +124,39 @@ A3A_saveData set [
     _coalitionConfig
 ] call A3A_fnc_setStatVariable;
 
+// Faction-tab override controls are setup metadata, not A3AU Params.
+private _factionOverrideState = A3A_saveData getOrDefault [
+    "Thorne_factionOverrideState",
+    [false, false, false, false]
+];
+
+if !(
+    _factionOverrideState isEqualType []
+    && {count _factionOverrideState >= 4}
+) then {
+    _factionOverrideState = [
+        false,
+        false,
+        false,
+        false
+    ];
+};
+
+A3A_saveData set [
+    "Thorne_factionOverrideState",
+    _factionOverrideState
+];
+
+[
+    "Thorne_factionOverrideState",
+    _factionOverrideState
+] call A3A_fnc_setStatVariable;
+
 diag_log format [
-    "[Thorne Coalition Save] persistentSave enabled=%1 config=%2",
+    "[Thorne Coalition Save] persistentSave enabled=%1 config=%2 overrides=%3",
     _coalitionEnabled,
-    _coalitionConfig
+    _coalitionConfig,
+    _factionOverrideState
 ];
 
 private ["_garrison"];

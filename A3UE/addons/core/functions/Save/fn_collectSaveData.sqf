@@ -19,7 +19,8 @@ private _optionalVars = [
     // These need to be returned to the setup GUI before the server starts,
     // otherwise the extra OCC/INV templates cannot be loaded in time.
     "Thorne_coalitionEnabled",
-    "Thorne_coalitionConfig"
+    "Thorne_coalitionConfig",
+    "Thorne_factionOverrideState"
 ];
 
 private _fnc_gameMissing = { isNil {"membersX" call A3A_fnc_returnSavedStat} };

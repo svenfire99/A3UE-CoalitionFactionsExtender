@@ -392,10 +392,16 @@ switch (_mode) do
                 private _name = _ctrl lbData _current;
                 _ctrl setVariable ["Thorne_primaryFaction", _name];
 
-                if (_x == A3A_IDC_SETUP_OCCUPANTSLISTBOX) then {
-                    _display setVariable ["Thorne_occSelections", [_name]];
-                } else {
-                    _display setVariable ["Thorne_invSelections", [_name]];
+                switch (_x) do {
+                    case A3A_IDC_SETUP_OCCUPANTSLISTBOX: {
+                        _display setVariable ["Thorne_occSelections", [_name]];
+                    };
+                    case A3A_IDC_SETUP_INVADERSLISTBOX: {
+                        _display setVariable ["Thorne_invSelections", [_name]];
+                    };
+                    case A3A_IDC_SETUP_RIVALSLISTBOX: {
+                        _display setVariable ["Thorne_rivSelections", [_name]];
+                    };
                 };
             } else {
                 // Return to normal AU single-selection mode.
@@ -419,13 +425,14 @@ switch (_mode) do
             };
         } forEach [
             A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-            A3A_IDC_SETUP_INVADERSLISTBOX
+            A3A_IDC_SETUP_INVADERSLISTBOX,
+            A3A_IDC_SETUP_RIVALSLISTBOX
         ];
 
         if (!_enabled) then {
             missionNamespace setVariable [
                 "Thorne_CoalitionConfigNet",
-                [[], []],
+                [[], [], []],
                 true
             ];
         };
@@ -454,14 +461,15 @@ switch (_mode) do
         private _idc = ctrlIDC _listbox;
         private _isCoalitionList = _idc in [
             A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-            A3A_IDC_SETUP_INVADERSLISTBOX
+            A3A_IDC_SETUP_INVADERSLISTBOX,
+            A3A_IDC_SETUP_RIVALSLISTBOX
         ];
 
         private _coalitionEnabled =
             cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
 
-        // Rebels, Civilians and Rivals always keep stock behaviour.
-        // OCC/INV also behave as stock lists while the checkbox is off.
+        // Rebels and Civilians always keep stock behaviour.
+        // OCC/INV/RIV behave as stock lists while the checkbox is off.
         if (!_isCoalitionList || !_coalitionEnabled) exitWith {
             if (_isCoalitionList) then {
                 _listbox lbSetSelected [-1, false];
@@ -496,10 +504,16 @@ switch (_mode) do
             _listbox setVariable ["Thorne_primaryFaction", _primary];
         };
 
-        if (_idc == A3A_IDC_SETUP_OCCUPANTSLISTBOX) then {
-            _display setVariable ["Thorne_occSelections", _names];
-        } else {
-            _display setVariable ["Thorne_invSelections", _names];
+        switch (_idc) do {
+            case A3A_IDC_SETUP_OCCUPANTSLISTBOX: {
+                _display setVariable ["Thorne_occSelections", _names];
+            };
+            case A3A_IDC_SETUP_INVADERSLISTBOX: {
+                _display setVariable ["Thorne_invSelections", _names];
+            };
+            case A3A_IDC_SETUP_RIVALSLISTBOX: {
+                _display setVariable ["Thorne_rivSelections", _names];
+            };
         };
 
         diag_log format [
@@ -521,7 +535,8 @@ switch (_mode) do
             private _listbox = _display displayCtrl _listboxIDC;
             private _isCoalitionList = _listboxIDC in [
                 A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-                A3A_IDC_SETUP_INVADERSLISTBOX
+                A3A_IDC_SETUP_INVADERSLISTBOX,
+                A3A_IDC_SETUP_RIVALSLISTBOX
             ];
             private _coalitionEnabled =
                 cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
@@ -532,10 +547,19 @@ switch (_mode) do
 
             private _remembered = [];
             if (_isCoalitionList && _coalitionEnabled) then {
-                _remembered = if (_listboxIDC == A3A_IDC_SETUP_OCCUPANTSLISTBOX) then {
-                    _display getVariable ["Thorne_occSelections", []]
-                } else {
-                    _display getVariable ["Thorne_invSelections", []]
+                _remembered = switch (_listboxIDC) do {
+                    case A3A_IDC_SETUP_OCCUPANTSLISTBOX: {
+                        _display getVariable ["Thorne_occSelections", []]
+                    };
+                    case A3A_IDC_SETUP_INVADERSLISTBOX: {
+                        _display getVariable ["Thorne_invSelections", []]
+                    };
+                    case A3A_IDC_SETUP_RIVALSLISTBOX: {
+                        _display getVariable ["Thorne_rivSelections", []]
+                    };
+                    default {
+                        []
+                    };
                 };
 
                 if (_remembered isEqualTo [] && {_selected != ""}) then {
@@ -604,10 +628,16 @@ switch (_mode) do
                     _listBox setVariable ["Thorne_primaryFaction", _primary];
                 };
 
-                if (_listboxIDC == A3A_IDC_SETUP_OCCUPANTSLISTBOX) then {
-                    _display setVariable ["Thorne_occSelections", _names];
-                } else {
-                    _display setVariable ["Thorne_invSelections", _names];
+                switch (_listboxIDC) do {
+                    case A3A_IDC_SETUP_OCCUPANTSLISTBOX: {
+                        _display setVariable ["Thorne_occSelections", _names];
+                    };
+                    case A3A_IDC_SETUP_INVADERSLISTBOX: {
+                        _display setVariable ["Thorne_invSelections", _names];
+                    };
+                    case A3A_IDC_SETUP_RIVALSLISTBOX: {
+                        _display setVariable ["Thorne_rivSelections", _names];
+                    };
                 };
             } else {
                 if (lbCurSel _listBox == -1) then {
@@ -663,6 +693,51 @@ switch (_mode) do
             ["Setup", _msg] spawn A3A_fnc_customHint;
         };
 
+        // -----------------------------------------------------------------
+        // A3UE: add saved coalition extras back to the available faction lists
+        // even if Camo/Side filters would normally hide them.
+        // -----------------------------------------------------------------
+        private _savedCoalitionConfig = missionNamespace getVariable [
+            "Thorne_CoalitionConfigNet",
+            [[], [], []]
+        ];
+
+        if (
+            _savedCoalitionConfig isEqualType []
+            && {count _savedCoalitionConfig >= 2}
+        ) then {
+            if ((count _savedCoalitionConfig) < 3) then {
+                _savedCoalitionConfig pushBack [];
+            };
+
+            {
+                private _bucketIndex = _forEachIndex;
+
+                {
+                    if (_x isEqualType [] && {count _x > 0}) then {
+                        private _configName = _x # 0;
+                        private _cfg =
+                            A3A_SETUP_CONFIGFILE
+                            / "A3A"
+                            / "Templates"
+                            / _configName;
+
+                        if (
+                            isClass _cfg
+                            && {_cfg call _fnc_factionLoaded}
+                        ) then {
+                            _factions # _bucketIndex pushBackUnique _cfg;
+                        };
+                    };
+                } forEach _x;
+
+            } forEach [
+                _savedCoalitionConfig param [0, []],
+                _savedCoalitionConfig param [1, []],
+                _savedCoalitionConfig param [2, []]
+            ];
+        };
+
         // Add the non-loadable factions back in
         if (cbChecked (_display displayCtrl A3A_IDC_SETUP_SHOWMISSINGCHECK)) then {
             { _x append _missingFactions#_forEachIndex } forEach _factions;
@@ -688,6 +763,8 @@ switch (_mode) do
             _display displayCtrl A3A_IDC_SETUP_OCCUPANTSLISTBOX;
         private _invCtrl =
             _display displayCtrl A3A_IDC_SETUP_INVADERSLISTBOX;
+        private _rivCtrl =
+            _display displayCtrl A3A_IDC_SETUP_RIVALSLISTBOX;
 
         private _fnc_getMain = {
             params ["_ctrl"];
@@ -712,7 +789,10 @@ switch (_mode) do
 
             if !(_primary in _names) then {
                 _primary = _names # 0;
-                _ctrl setVariable ["Thorne_primaryFaction", _primary];
+                _ctrl setVariable [
+                    "Thorne_primaryFaction",
+                    _primary
+                ];
             };
 
             _primary
@@ -720,6 +800,7 @@ switch (_mode) do
 
         private _mainOcc = [_occCtrl] call _fnc_getMain;
         private _mainInv = [_invCtrl] call _fnc_getMain;
+        private _mainRiv = [_rivCtrl] call _fnc_getMain;
 
         private _factions = [
             _mainOcc,
@@ -730,9 +811,7 @@ switch (_mode) do
             (_display displayCtrl A3A_IDC_SETUP_CIVILIANSLISTBOX)
                 lbData
                 lbCurSel (_display displayCtrl A3A_IDC_SETUP_CIVILIANSLISTBOX),
-            (_display displayCtrl A3A_IDC_SETUP_RIVALSLISTBOX)
-                lbData
-                lbCurSel (_display displayCtrl A3A_IDC_SETUP_RIVALSLISTBOX)
+            _mainRiv
         ];
 
         private _fnc_buildExtras = {
@@ -790,38 +869,34 @@ switch (_mode) do
             _entries
         };
 
-        private _occExtras = [
-            _occCtrl,
-            _mainOcc
-        ] call _fnc_buildExtras;
+        private _occExtras = [_occCtrl, _mainOcc] call _fnc_buildExtras;
+        private _invExtras = [_invCtrl, _mainInv] call _fnc_buildExtras;
+        private _rivExtras = [_rivCtrl, _mainRiv] call _fnc_buildExtras;
 
-        private _invExtras = [
-            _invCtrl,
-            _mainInv
-        ] call _fnc_buildExtras;
-
-        // Network-friendly array. Existing Thorne server code converts this
-        // into its occ/inv HashMap when compatibilityLoadFaction runs.
         missionNamespace setVariable [
             "Thorne_CoalitionConfigNet",
             [
                 _occExtras,
-                _invExtras
+                _invExtras,
+                _rivExtras
             ],
             true
         ];
 
         diag_log format [
-            "[Thorne Coalition UI] getFactions enabled=%1 mainOcc='%2' mainInv='%3' occExtras=%4 invExtras=%5",
+            "[Thorne Coalition UI] getFactions enabled=%1 mainOcc='%2' mainInv='%3' mainRiv='%4' occExtras=%5 invExtras=%6 rivExtras=%7",
             _coalitionEnabled,
             _mainOcc,
             _mainInv,
+            _mainRiv,
             _occExtras,
-            _invExtras
+            _invExtras,
+            _rivExtras
         ];
 
         _factions;
     };
+
 
     case ("getContent"):
     {
