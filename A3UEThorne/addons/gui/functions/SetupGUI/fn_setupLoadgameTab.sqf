@@ -13,14 +13,13 @@ Return Value:
 
 */
 
-#include "\x\A3A\addons\gui\dialogues\ids.inc"
 #include "..\..\dialogues\ids.inc"
 #include "\x\A3A\addons\gui\dialogues\defines.hpp"
 #include "\x\A3A\addons\gui\dialogues\textures.inc"
 #include "..\..\script_component.hpp"
 FIX_LINE_NUMBERS()
 
-params["_mode", "_params"];
+params [["_mode", "", [""]], ["_params", [], [[]]]];
 
 Debug_1("Loadgame dialog called with mode %1", _mode);
 
@@ -36,12 +35,12 @@ private _newSaveCtrl = _display displayCtrl A3A_IDC_SETUP_NAMESPACECHECKBOX;
 private _saveInfoCtrl = _display displayCtrl A3A_IDC_SETUP_SAVEINFOTEXT;
 
 private _saveBoxColumns = [
-    ["gameID", "ID", 0, 9],
-    ["mapStr", localize "STR_antistasi_setup_dialog_table_map", 9, 25],
-    ["name", localize "STR_antistasi_setup_dialog_table_name", 25, 45],
-    ["verStr", localize "STR_antistasi_setup_dialog_table_version", 70, 12],
-    ["timeStr", localize "STR_antistasi_setup_dialog_table_time", 82, 15],
-    ["fileStr", localize "STR_antistasi_setup_dialog_table_file", 97, 9]
+    ["gameID", "ID", 0, 12],
+    ["mapStr", localize "STR_antistasi_setup_dialog_table_map", 14, 20, "mapStrShort"],
+    ["name", localize "STR_antistasi_setup_dialog_table_name", 36, 44],
+    ["verStr", localize "STR_antistasi_setup_dialog_table_version", 82, 12],
+    ["timeStr", localize "STR_antistasi_setup_dialog_table_time", 94, 15],
+    ["fileStr", localize "STR_antistasi_setup_dialog_table_file", 110, 8]
 ];
 
 switch (_mode) do
@@ -49,8 +48,8 @@ switch (_mode) do
     case ("onLoad"):
     {
         _display setVariable ["savedFactions", [[], [], []]];
-        _display setVariable ["savedParams", []];
-        _display setVariable ["savedFactionOverrides", [false, false, false]];
+        _display setVariable ["savedParams", createHashMap];
+        _display setVariable ["Thorne_setupState", createHashMap];
         _listboxCtrl setVariable ["rowIndex", -1];
 
         private _platformIsWindows = A3A_setup_platform isEqualTo "Windows";
@@ -90,114 +89,45 @@ switch (_mode) do
         (_display displayCtrl A3A_IDC_SETUP_OLDPARAMSTEXT) ctrlShow _newGame;
         (_display displayCtrl A3A_IDC_SETUP_NAMESPACETEXT) ctrlShow _newGame;
         (_display displayCtrl A3A_IDC_SETUP_HQPOSBUTTON) ctrlShow (_newGame && !cbChecked _copyGameCtrl);
+        (_display displayCtrl A3A_IDC_SETUP_EDITZONES_BUTTON) ctrlShow (_newGame && !cbChecked _copyGameCtrl);
+
+        private _setupState = if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then {
+            [createHashMapFromArray [["factions", ["", "", "", "", ""]]]] call Thorne_fnc_readSetupState
+        } else {
+            [_saveData] call Thorne_fnc_readSetupState
+        };
+        _display setVariable ["Thorne_setupState", _setupState];
+        private _ctrl_coalitionEnabled = (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
+        private _value_coalitionEnabled = _setupState getOrDefault ["coalitionEnabled", false];
+        if (cbChecked _ctrl_coalitionEnabled != _value_coalitionEnabled) then { _ctrl_coalitionEnabled cbSetChecked _value_coalitionEnabled };
+        private _ctrl_switchEnemySides = (_display displayCtrl A3A_IDC_SETUP_SWITCHENEMYCHECK);
+        private _value_switchEnemySides = _setupState getOrDefault ["switchEnemySides", false];
+        if (cbChecked _ctrl_switchEnemySides != _value_switchEnemySides) then { _ctrl_switchEnemySides cbSetChecked _value_switchEnemySides };
+        private _ctrl_overrideSideLimits = (_display displayCtrl A3A_IDC_SETUP_ANYENEMYCHECK);
+        private _value_overrideSideLimits = _setupState getOrDefault ["overrideSideLimits", false];
+        if (cbChecked _ctrl_overrideSideLimits != _value_overrideSideLimits) then { _ctrl_overrideSideLimits cbSetChecked _value_overrideSideLimits };
+        private _ctrl_overrideCamoLimits = (_display displayCtrl A3A_IDC_SETUP_IGNORECAMOCHECK);
+        private _value_overrideCamoLimits = _setupState getOrDefault ["overrideCamoLimits", false];
+        if (cbChecked _ctrl_overrideCamoLimits != _value_overrideCamoLimits) then { _ctrl_overrideCamoLimits cbSetChecked _value_overrideCamoLimits };
 
         // If we're selecting a game to load, load factions if available
         private _factions = [_saveData get "factions", _saveData get "addonVics", _saveData get "DLC"];
         if (isNil {_factions#0}) then { _factions = [[], [], []] };
         if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then { _factions = [[], [], []] };
-
-        private _coalitionEnabled = _saveData getOrDefault [
-            "Thorne_coalitionEnabled",
-            false
-        ];
-
-        private _coalitionConfig = _saveData getOrDefault [
-            "Thorne_coalitionConfig",
-            [[], [], []]
-        ];
-
-        if !(_coalitionConfig isEqualType []) then {
-            _coalitionConfig = [[], [], []];
-        };
-
-        if ((count _coalitionConfig) < 3) then {
-            _coalitionConfig pushBack [];
-        };
-
-        if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then {
-            _coalitionEnabled = false;
-            _coalitionConfig = [[], [], []];
-        };
-
-        (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK)
-            cbSetChecked _coalitionEnabled;
-
-        missionNamespace setVariable [
-            "Thorne_CoalitionConfigNet",
-            _coalitionConfig,
-            true
-        ];
-
-        // A3UE selector metadata, restored BEFORE AU rebuilds the lists.
-        private _factionOverrides = _saveData getOrDefault [
-            "Thorne_factionOverrides",
-            [false, false, false]
-        ];
-
-        if !(
-            _factionOverrides isEqualType []
-            && {count _factionOverrides >= 3}
-        ) then {
-            _factionOverrides = [
-                false,
-                false,
-                false
-            ];
-        };
-
-        if ((cbChecked _newGameCtrl and !cbChecked _copyGameCtrl) or !_sameMap) then {
-            _factionOverrides = [
-                false,
-                false,
-                false
-            ];
-        };
-
-        private _overridesChanged =
-            _factionOverrides isNotEqualTo (
-                _display getVariable [
-                    "savedFactionOverrides",
-                    [false, false, false]
-                ]
-            );
-
-        if (_overridesChanged) then {
-            [
-                _display,
-                _factionOverrides
-            ] call Thorne_fnc_applyFactionOverrides;
-
-            _display setVariable [
-                "savedFactionOverrides",
-                +_factionOverrides
-            ];
-
-            missionNamespace setVariable [
-                "Thorne_FactionOverridesNet",
-                +_factionOverrides,
-                true
-            ];
-
-            diag_log format [
-                "[Thorne Coalition Save] restored faction overrides switch=%1 sideLimits=%2 camo=%3",
-                _factionOverrides # 0,
-                _factionOverrides # 1,
-                _factionOverrides # 2
-            ];
-        };
-
+        private _stateSignature = str _setupState;
         if (
             _factions isNotEqualTo (_display getVariable "savedFactions")
-            || {_overridesChanged}
+            || {_stateSignature != (_display getVariable ["Thorne_setupStateSignature", ""])}
         ) then {
             _display setVariable ["savedFactions", _factions];
+            _display setVariable ["Thorne_setupStateSignature", _stateSignature];
             ["fillFactions"] call A3A_fnc_setupFactionsTab;
             ["fillContent"] call A3A_fnc_setupFactionsTab;
         };
 
         // If it's not a new game or load params or copy game is checked, load params
-        private _params = _saveData get "params";
-        if (isNil "_params") then { _params = [] };               // getOrDefault doesn't work because input code may set nils
+        private _params = if ("params" in _saveData) then [{ _saveData get "params" }, { createHashMap }];
+
         if ((_sameMap and !cbChecked _newGameCtrl) or cbChecked _copyGameCtrl or cbChecked _oldParamsCtrl) then {
             if (count _params > 0 and _params isNotEqualTo (_display getVariable "savedParams")) then { 
                 _display setVariable ["savedParams", _params];
@@ -205,7 +135,7 @@ switch (_mode) do
             };
         } else {
             if (cbChecked _newGameCtrl && {!(_display getVariable ["paramsChangedSinceReset", false])}) then { 
-                _display setVariable ["savedParams", []];
+                _display setVariable ["savedParams", createHashMap];
                 ["fillParams"] call A3A_fnc_setupParamsTab;
             };
         };
@@ -217,13 +147,16 @@ switch (_mode) do
     {
         { ctrlDelete _x } forEach allControls _listboxCtrl;             // doesn't touch config controls
         {
-            _x params ["_varname", "", "_xpos", "_width"];
+            _x params ["_varname", "", "_xpos", "_width", ["_toolTip", nil, [""]]];
             private _ctrls = [];
             {
                 private _ctrl = _display ctrlCreate ["A3A_Text_Small", -1, _listboxCtrl];
                 _ctrl ctrlSetPosition [GRID_W*_xpos, GRID_H*_forEachIndex*4, GRID_W*_width, GRID_H*4];
                 _ctrl ctrlCommit 0;
-                _ctrl ctrlSetText (_x getOrDefault [_varname, ""]);
+                private _ctrlText = _x getOrDefault [_varname, ""];
+                if (_varname isEqualTo "gameID") then { _ctrlText = _ctrlText select[0, 7] };
+                _ctrl ctrlSetText _ctrlText;
+                if (!isNil "_toolTip") then { _ctrl ctrlSetTooltip(_x getOrDefault[_toolTip, "N/A"]) };
                 if (_x get "map" != worldName) then { _ctrl ctrlSetTextColor [0.6,0.6,0.6,1] };
                 _ctrls pushBack _ctrl;
             } forEach A3A_setup_saveData;
@@ -315,274 +248,152 @@ switch (_mode) do
         _saveData set ["addonVics", _contentData#0];
         _saveData set ["DLC", _contentData#1];
 
-        // A3UE selector metadata. This follows AU's own pattern:
-        // put it into A3A_saveData at start, then saveLoop persists it.
-        private _coalitionEnabled = missionNamespace getVariable [
-            "Thorne_CoalitionEnabledNet",
-            cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK)
-        ];
+        private _getOrder = {
+            params ["_idc", "_primary"];
 
-        private _coalitionConfig = missionNamespace getVariable [
-            "Thorne_CoalitionConfigNet",
-            [[], [], []]
-        ];
+            private _lb = _display displayCtrl _idc;
 
-        if ((count _coalitionConfig) < 3) then {
-            _coalitionConfig pushBack [];
+            // Read the ACTUAL selected rows from the control at the moment
+            // Start Game is pressed.
+            private _selected = [];
+
+            for "_i" from 0 to ((lbSize _lb) - 1) do {
+                if (_lb lbIsSelected _i) then {
+                    private _data = _lb lbData _i;
+                    if (_data != "") then {
+                        _selected pushBackUnique _data;
+                    };
+                };
+            };
+
+            // Preserve previous selection order so the first selected faction
+            // remains the primary faction.
+            private _order = _lb getVariable [
+                "Thorne_selectionOrder",
+                []
+            ];
+
+            if !(_order isEqualType []) then {
+                _order = [_order];
+            } else {
+                _order = +_order;
+            };
+
+            _order = _order select {
+                _x in _selected
+            };
+
+            {
+                _order pushBackUnique _x;
+            } forEach _selected;
+
+            // AU still needs one normal primary faction in its factions array.
+            // Keep that primary at index 0 without discarding coalition members.
+            if (
+                _primary != ""
+                && {_primary in _selected}
+            ) then {
+                if !(_primary in _order) then {
+                    _order insert [0, [_primary]];
+                };
+            };
+
+            // Fallback for single-select/legacy states.
+            if (
+                _order isEqualTo []
+                && {_primary != ""}
+            ) then {
+                _order = [_primary];
+            };
+
+            _lb setVariable [
+                "Thorne_selectionOrder",
+                _order
+            ];
+
+            _order
         };
+        private _occSelection = [
+            A3A_IDC_SETUP_OCCUPANTSLISTBOX,
+            _factions#0
+        ] call _getOrder;
 
-        _saveData set [
-            "Thorne_coalitionEnabled",
-            _coalitionEnabled
-        ];
+        private _invSelection = [
+            A3A_IDC_SETUP_INVADERSLISTBOX,
+            _factions#1
+        ] call _getOrder;
 
-        _saveData set [
-            "Thorne_coalitionConfig",
-            _coalitionConfig
-        ];
+        private _rivSelection = [
+            A3A_IDC_SETUP_RIVALSLISTBOX,
+            _factions#4
+        ] call _getOrder;
 
-        private _factionOverrides = [
-            _display
-        ] call Thorne_fnc_getFactionOverrides;
-
-        _saveData set [
-            "Thorne_factionOverrides",
-            _factionOverrides
-        ];
-
-        missionNamespace setVariable [
-            "Thorne_FactionOverridesNet",
-            +_factionOverrides,
-            true
+        private _setupState = createHashMapFromArray [
+            ["version", 2],
+            ["coalitionEnabled", cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK)],
+            ["occupants", _occSelection],
+            ["invaders", _invSelection],
+            ["rivals", _rivSelection],
+            ["switchEnemySides", cbChecked (_display displayCtrl A3A_IDC_SETUP_SWITCHENEMYCHECK)],
+            ["overrideSideLimits", cbChecked (_display displayCtrl A3A_IDC_SETUP_ANYENEMYCHECK)],
+            ["overrideCamoLimits", cbChecked (_display displayCtrl A3A_IDC_SETUP_IGNORECAMOCHECK)]
         ];
 
         diag_log format [
-            "[Thorne Coalition Save] setup save enabled=%1 factions=%2 config=%3 overrides=%4",
-            _coalitionEnabled,
-            _factions,
-            _coalitionConfig,
-            _factionOverrides
+            "[A3UEThorne Coalition] setup selections OCC=%1 INV=%2 RIV=%3",
+            _occSelection,
+            _invSelection,
+            _rivSelection
         ];
+        _display setVariable ["Thorne_setupState", _setupState];
+        private _plugins = _saveData getOrDefault ["saveDataPlugins", createHashMap];
+        if (_plugins isEqualType []) then { _plugins = createHashMapFromArray _plugins };
+        if !(_plugins isEqualType createHashMap) then { _plugins = createHashMap };
+        _plugins set ["A3UEThorne_Setup", _setupState];
+        _saveData set ["saveDataPlugins", _plugins];
 
         private _invEnabled = ctrlEnabled A3A_IDC_SETUP_INVADERSLISTBOX;
         private _rivEnabled = ctrlEnabled A3A_IDC_SETUP_RIVALSLISTBOX;
+        private _displayNames = {
+            params ["_value"];
 
-
-        // ------------------------------------------------------------
-        // Normal faction display names
-        // ------------------------------------------------------------
-
-        private _rebelName =
-            getText (
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / (_factions # 2)
-                / "name"
-            );
-
-        private _civName =
-            getText (
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / (_factions # 3)
-                / "name"
-            );
-
-        private _occMainName =
-            getText (
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / (_factions # 0)
-                / "name"
-            );
-
-        private _invMainName =
-            getText (
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / (_factions # 1)
-                / "name"
-            );
-
-        private _rivalName =
-            getText (
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / (_factions # 4)
-                / "name"
-            );
-
-
-        // ------------------------------------------------------------
-        // Coalition data
-        //
-        // Format:
-        // [
-        //     OCC extras,
-        //     INV extras,
-        //     RIV extras
-        // ]
-        //
-        // Extra entry:
-        // [configName, templatePath]
-        // ------------------------------------------------------------
-
-        private _coalitionData = missionNamespace getVariable [
-            "Thorne_CoalitionConfigNet",
-            [[], [], []]
-        ];
-
-        private _occExtras = _coalitionData param [
-            0,
-            []
-        ];
-
-        private _invExtras = _coalitionData param [
-            1,
-            []
-        ];
-
-        private _rivExtras = _coalitionData param [
-            2,
-            []
-        ];
-
-
-        // ------------------------------------------------------------
-        // Resolve configName -> display name
-        // ------------------------------------------------------------
-
-        private _fnc_getFactionDisplayName = {
-            params ["_configName"];
-
-            private _cfg =
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / _configName;
-
-            if (isClass _cfg) exitWith {
-                getText (_cfg / "name")
+            private _arr = if (_value isEqualType []) then {
+                +_value
+            } else {
+                if (_value isEqualType "") then {
+                    if (_value == "") then { [] } else { [_value] }
+                } else {
+                    []
+                }
             };
 
-            _configName
+            (_arr apply {
+                private _cfg = A3A_SETUP_CONFIGFILE/"A3A"/"Templates"/_x;
+                if (isClass _cfg) then {
+                    getText (_cfg/"name")
+                } else {
+                    _x
+                }
+            }) joinString ", "
         };
-
-
-        // ------------------------------------------------------------
-        // Build OCC list
-        // ------------------------------------------------------------
-
-        private _occNames = [
-            _occMainName
-        ];
-
-        {
-            _x params [
-                "_configName",
-                ["_templatePath", ""]
-            ];
-
-            private _displayName = [
-                _configName
-            ] call _fnc_getFactionDisplayName;
-
-            _occNames pushBackUnique _displayName;
-
-        } forEach _occExtras;
-
-
-        // ------------------------------------------------------------
-        // Build INV list
-        // ------------------------------------------------------------
-
-        private _invNames = [
-            _invMainName
-        ];
-
-        {
-            _x params [
-                "_configName",
-                ["_templatePath", ""]
-            ];
-
-            private _displayName = [
-                _configName
-            ] call _fnc_getFactionDisplayName;
-
-            _invNames pushBackUnique _displayName;
-
-        } forEach _invExtras;
-
-        private _rivNames = [
-            _rivalName
-        ];
-
-        {
-            _x params [
-                "_configName",
-                ["_templatePath", ""]
-            ];
-
-            _rivNames pushBackUnique (
-                [_configName] call _fnc_getFactionDisplayName
-            );
-
-        } forEach _rivExtras;
-
-
-        // ------------------------------------------------------------
-        // Convert to confirmation text
-        // ------------------------------------------------------------
-
-        private _occDisplay =
-            _occNames joinString ", ";
-
-        private _invDisplay =
-            _invNames joinString ", ";
-
-        private _rivDisplay =
-            _rivNames joinString ", ";
-
-
-        // ------------------------------------------------------------
-        // Build same array AU expects
-        // ------------------------------------------------------------
-
         private _factionNames = [
-
-            // Rebels
-            _rebelName,
-
-            // Civilians
-            _civName,
-
-            // Occupants
-            _occDisplay,
-
-            // Invaders
+            getText (A3A_SETUP_CONFIGFILE/"A3A"/"Templates"/_factions#2/"name"),
+            getText (A3A_SETUP_CONFIGFILE/"A3A"/"Templates"/_factions#3/"name"),
+            [_occSelection] call _displayNames,
             [
                 localize "STR_params_afk_disabled",
-                _invDisplay
+                [_invSelection] call _displayNames
             ] select _invEnabled,
-
-            // Rivals
             [
                 localize "STR_params_afk_disabled",
-                _rivDisplay
+                [_rivSelection] call _displayNames
             ] select _rivEnabled
-
         ];
         _confirmText = _confirmText + endl + format [localize "STR_antistasi_dialogs_setup_confirm_factions", _factionNames#0, _factionNames#1, _factionNames#2, _factionNames#3, _factionNames#4];
 
         // Params tab: Array of [name, value]
-        private _paramsData = ["getParams"] call A3A_fnc_setupParamsTab;
-        _saveData set ["params", _paramsData];
+        private _savedParams = ["getParams"] call A3A_fnc_setupParamsTab;
+        _saveData set["params", _savedParams];
 
         // Set data & function for confirmation, then open confirmation box
         _display setVariable ["confirmData", [_confirmText, A3A_fnc_setupLoadgameTab, "startGameConfirm"]];
@@ -604,9 +415,9 @@ switch (_mode) do
         private _lbCurSel = _listboxCtrl getVariable "rowIndex";
         switch (true) do {
             case (_lbCurSel isEqualTo -1): { _saveInfoCtrl ctrlSetText localize "STR_antistasi_dialogs_setup_new_save" };
-            case (cbChecked _copyGameCtrl): { _saveInfoCtrl ctrlSetText format [localize "STR_antistasi_dialogs_setup_copy_save", A3A_setup_saveData select _lbCurSel get "gameID"] };
+            case (cbChecked _copyGameCtrl): { _saveInfoCtrl ctrlSetText format [localize "STR_antistasi_dialogs_setup_copy_save", A3A_setup_saveData select _lbCurSel get "gameID" select[0, 4]] };
             case (cbChecked _newGameCtrl): { _saveInfoCtrl ctrlSetText localize "STR_antistasi_dialogs_setup_new_save" };
-            default { _saveInfoCtrl ctrlSetText format [localize "STR_antistasi_dialogs_setup_edit_save", A3A_setup_saveData select _lbCurSel get "gameID"] };
+            default { _saveInfoCtrl ctrlSetText format [localize "STR_antistasi_dialogs_setup_edit_save", A3A_setup_saveData select _lbCurSel get "gameID" select[0, 4]] };
         };
     };
 
@@ -642,6 +453,11 @@ switch (_mode) do
         createDialog "A3A_SetupHQPosDialog";
     };
 
+    case ("editZones"):
+    {
+        createDialog "A3A_SetupEditZonesDialog";
+    };
+
     case ("deleteGame"):
     {
         private _index = _listboxCtrl getVariable ["rowIndex", -1];
@@ -666,7 +482,8 @@ switch (_mode) do
     {
         private _index = _listboxCtrl getVariable ["rowIndex", -1];
         if (_index == -1) exitWith {};
-        private _newName = ctrlText (_display displayCtrl A3A_IDC_SETUP_NAMEEDITBOX);
+        private _nameBoxCtrl = _display displayCtrl A3A_IDC_SETUP_NAMEEDITBOX;
+        private _newName = ctrlText _nameBoxCtrl;
 
         // Set name in save data
         private _saveData = A3A_setup_saveData select _index;
@@ -679,5 +496,8 @@ switch (_mode) do
         // Set name in the displayed table
         private _nameCtrl = _listboxCtrl getVariable "nameCtrls" select _index;
         _nameCtrl ctrlSetText _newName;
+
+        // Clear the name edit box
+        _nameBoxCtrl ctrlSetText "";
     };
 };

@@ -1,5 +1,3 @@
-#include "\x\A3A\addons\core\script_component.hpp"
-
 /*
  * File: fn_createUnit.sqf
  * Description:
@@ -25,28 +23,10 @@
 
 params ["_group", "_type", "_position", ["_markers", []], ["_placement", 0], ["_special", "NONE"]];
 
-private _requestedType = _type;
-
-_group setVariable [
-    "Thorne_CoalitionPrefix",
-    "riv",
-    false
-];
-
-if ((_group getVariable ["Thorne_CoalitionTag", ""]) == "") then {
-    [
-        _group,
-        "riv",
-        [_type]
-    ] call Thorne_fnc_selectCoalitionForGroup;
+if (missionNamespace getVariable ["Thorne_CoalitionEnabledNet", false]) then {
+    [_group, "riv", [_type]] call Thorne_fnc_selectCoalitionForGroup;
+    _type = [_group, "riv", _type] call Thorne_fnc_resolveCoalitionType;
 };
-
-_type = [
-    _group,
-    "riv",
-    _type
-] call Thorne_fnc_resolveCoalitionType;
-
 
 private _unitDefinition = A3A_customUnitTypes getVariable [_type, []];
 
@@ -87,46 +67,6 @@ if !(_unitDefinition isEqualTo []) exitWith {
 	    _unit setUnitLoadout selectRandom _loadouts;
     };
 	_unit setVariable ["unitType", _type, true];
-    _unit setVariable ["Thorne_OriginalUnitType", _requestedType, true];
-    _unit setVariable [
-        "Thorne_CoalitionPrefix",
-        "riv",
-        true
-    ];
-    _unit setVariable [
-        "Thorne_CoalitionTag",
-        _group getVariable ["Thorne_CoalitionTag", "BASE"],
-        true
-    ];
-
-    // RivalCreateUnit bypasses normal A3A_fnc_createUnit identity creation.
-    // Resolve identity directly from the exact generated coalition type.
-    private _identityFaction = A3A_faction_riv;
-
-    if (!isNil "Thorne_CoalitionTypeFactionMap") then {
-        private _coalitionFaction =
-            Thorne_CoalitionTypeFactionMap getOrDefault [
-                _type,
-                createHashMap
-            ];
-
-        if (
-            _coalitionFaction isEqualType createHashMap
-            && {count _coalitionFaction > 0}
-        ) then {
-            _identityFaction = _coalitionFaction;
-        };
-    };
-
-    private _identity = [
-        _identityFaction,
-        _type
-    ] call A3A_fnc_createRandomIdentity;
-
-    [
-        _unit,
-        _identity
-    ] call A3A_fnc_setIdentity;
 
 	//it's very fragile and non-extensible (adding second bool or string value into template will break this)
 	{
@@ -150,11 +90,4 @@ if !(_unitDefinition isEqualTo []) exitWith {
 
 private _unit = _group createUnit [_type, _position, _markers, _placement, _special];
 _unit setVariable ["unitType", _type, true];
-_unit setVariable ["Thorne_OriginalUnitType", _requestedType, true];
-_unit setVariable ["Thorne_CoalitionPrefix", "riv", true];
-_unit setVariable [
-    "Thorne_CoalitionTag",
-    _group getVariable ["Thorne_CoalitionTag", "BASE"],
-    true
-];
 _unit

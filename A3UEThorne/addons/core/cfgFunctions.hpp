@@ -4,33 +4,32 @@ class CfgFunctions
     {
         class CREATE
         {
-            class createUnit { file = QPATHTOFOLDER(functions\CREATE\fn_createUnit.sqf); };
-            class NATOinit { file = QPATHTOFOLDER(functions\CREATE\fn_NATOinit.sqf); };
-            class spawnGroup { file = QPATHTOFOLDER(functions\CREATE\fn_spawnGroup.sqf); };
-
-            class RivalsCrewTypeForVehicle { file = QPATHTOFOLDER(functions\CREATE\fn_RivalsCrewTypeForVehicle.sqf); };
-            class RivalsSpawnGroup { file = QPATHTOFOLDER(functions\CREATE\fn_RivalsSpawnGroup.sqf); };
-            class RivalsSpawnVehicle { file = QPATHTOFOLDER(functions\CREATE\fn_RivalsSpawnVehicle.sqf); };
-            class RivalsCargoSeats { file = QPATHTOFOLDER(functions\CREATE\fn_RivalsCargoSeats.sqf); };
-            class RivalsCreateUnit { file = QPATHTOFOLDER(functions\CREATE\fn_RivalsCreateUnit.sqf); };
-            class RivalsCreateVehicleCrew { file = QPATHTOFOLDER(functions\CREATE\fn_RivalsCreateVehicleCrew.sqf); };
+            class NATOinit { file = "\x\A3UEThorne\addons\core\functions\CREATE\fn_NATOinit.sqf"; };
+            class spawnGroup { file = "\x\A3UEThorne\addons\core\functions\CREATE\fn_spawnGroup.sqf"; };
+            class RivalsSpawnGroup { file = "\x\A3UEThorne\addons\core\functions\CREATE\fn_RivalsSpawnGroup.sqf"; };
+            class RivalsCreateUnit { file = "\x\A3UEThorne\addons\core\functions\CREATE\fn_RivalsCreateUnit.sqf"; };
         };
 
         class FunctionsTemplates
         {
-            class compatibilityLoadFaction { file = QPATHTOFOLDER(functions\Templates\fn_compatibilityLoadFaction.sqf); };
-            class loadRivals { file = QPATHTOFOLDER(functions\Templates\fn_loadRivals.sqf); };
-        };
-
-        class Utility
-        {
-            class setIdentity { file = QPATHTOFOLDER(functions\Utility\fn_setIdentity.sqf); };
+            class compatibilityLoadFaction { file = "\x\A3UEThorne\addons\core\functions\Templates\fn_compatibilityLoadFaction.sqf"; };
+            class loadRivals { file = "\x\A3UEThorne\addons\core\functions\Templates\fn_loadRivals.sqf"; };
         };
 
         class Save
         {
-            class saveLoop { file = QPATHTOFOLDER(functions\Save\fn_saveLoop.sqf); };
-            class collectSaveData { file = QPATHTOFOLDER(functions\Save\fn_collectSaveData.sqf); };
+            class collectSaveData { file = "\x\A3UEThorne\addons\core\functions\Save\fn_collectSaveData.sqf"; };
+        };
+    };
+
+    class ABZ
+    {
+        class main
+        {
+            class poolFromFactions
+            {
+                file = "\x\A3UEThorne\addons\core\functions\Bazaar\fn_poolFromFactions.sqf";
+            };
         };
     };
 
@@ -40,8 +39,10 @@ class CfgFunctions
 
         class Coalition
         {
-            file = QPATHTOFOLDER(functions\Coalition);
+            file = "\x\A3UEThorne\addons\core\functions\Coalition";
             class initCoalition { preInit = 1; };
+            class readSetupState {};
+            class prepareCoalitionState {};
             class loadCoalitionFaction {};
             class loadCoalitionForSide {};
             class resolveCoalitionType {};

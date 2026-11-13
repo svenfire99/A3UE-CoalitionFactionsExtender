@@ -7,77 +7,41 @@
 
 #include "\x\A3A\addons\core\script_component.hpp"
 FIX_LINE_NUMBERS()
-
 params ["_file", "_side"];
 
-Info_2(
-    "Compatibility loading template: '%1' as side %2",
-    _file,
-    _side
-);
-
-private _defaultName = "EnemyDefaults";
-private _factionPrefix = "";
-
-if (_side isEqualTo Occupants) then {
-    _factionPrefix = "occ";
-} else {
-    if (_side isEqualTo Invaders) then {
-        _factionPrefix = "inv";
-    } else {
-        if (_side isEqualTo independent) then {
-            _factionPrefix = "reb";
-            _defaultName = "RebelDefaults";
-        } else {
-            if (_side isEqualTo civilian) then {
-                _factionPrefix = "civ";
-                _defaultName = "CivilianDefaults";
-            };
-        };
-    };
+if (_side isEqualTo west) then {
+    call Thorne_fnc_initCoalition;
+    [missionNamespace getVariable ["A3A_saveData", createHashMap]] call Thorne_fnc_prepareCoalitionState;
 };
 
-if (_factionPrefix == "") exitWith {
-    diag_log format [
-        "[Thorne Coalition] ERROR compatibilityLoadFaction unmapped side=%1 occupants=%2 invaders=%3",
-        _side,
-        Occupants,
-        Invaders
-    ];
-    createHashMap
-};
+Info_2("Compatibility loading template: '%1' as side %2", _file, _side);
 
-private _factionDefaultFile = format [
-    "\x\A3A\addons\core\Templates\Templates\FactionDefaults\%1.sqf",
-    _defaultName
-];
+private _factionDefaultFile = ["EnemyDefaults","EnemyDefaults","RebelDefaults","CivilianDefaults"] #([west, east, independent, civilian] find _side);
 
-diag_log format [
-    "[Thorne Coalition] compatibilityLoadFaction side=%1 prefix=%2 default='%3' faction='%4'",
-    _side,
-    _factionPrefix,
-    _factionDefaultFile,
-    _file
-];
+/*
+    This function is compiled inside A3UEThorne, so QPATHTOFOLDER() would
+    resolve to \x\A3UEThorne\addons\core\...
+    The faction defaults belong to Antistasi Ultimate itself.
+*/
+_factionDefaultFile =
+    "\x\A3A\addons\core\Templates\Templates\FactionDefaults\"
+    + _factionDefaultFile
+    + ".sqf";
 
-private _faction = [
-    [
-        _factionDefaultFile,
-        _file
-    ]
-] call A3A_fnc_loadFaction;
-
+private _faction = [[_factionDefaultFile,_file]] call A3A_fnc_loadFaction;
+private _factionPrefix = ["occ", "inv", "reb", "civ"] #([west, east, independent, civilian] find _side);
 missionNamespace setVariable ["A3A_faction_" + _factionPrefix, _faction];
 [_faction, _factionPrefix] call A3A_fnc_compileGroups;
 
 private _unitClassMap = _side call SCRT_fnc_unit_getUnitMap;
 private _baseUnitClass = switch (_side) do {
-    case west:        { "a3a_unit_west" };
-    case east:        { "a3a_unit_east" };
+    case west: { "a3a_unit_west" };
+    case east: { "a3a_unit_east" };
     case independent: { "a3a_unit_reb" };
-    case civilian:    { "a3a_unit_civ" };
+    case civilian: { "a3a_unit_civ" };
 };
 
+//validate loadouts
 private _loadoutsPrefix = format ["loadouts_%1_", _factionPrefix];
 private _allDefinitions = _faction get "loadouts";
 
@@ -85,15 +49,11 @@ private _allDefinitions = _faction get "loadouts";
     [_faction, _file] call A3A_fnc_TV_verifyLoadoutsData;
 #endif
 
+//Register loadouts globally.
 {
     private _loadoutName = _x;
-    private _definition = _y;
     private _unitClass = _unitClassMap getOrDefault [_loadoutName, _baseUnitClass];
-
-    [
-        _loadoutsPrefix + _loadoutName,
-        _definition + [_unitClass]
-    ] call A3A_fnc_registerUnitType;
+    [_loadoutsPrefix + _loadoutName, _y + [_unitClass]] call A3A_fnc_registerUnitType;
 } forEach _allDefinitions;
 
 #if __A3_DEBUG__
@@ -101,31 +61,27 @@ private _allDefinitions = _faction get "loadouts";
 #endif
 
 if (_side in [Occupants, Invaders]) then {
+    // Compile light armed that also have 4+ passenger seats
     private _lightArmedTroop = (_faction get "vehiclesLightArmed") select {
         ([_x, true] call BIS_fnc_crewCount) - ([_x, false] call BIS_fnc_crewCount) >= 4
     };
     _faction set ["vehiclesLightArmedTroop", _lightArmedTroop];
 
-    private _vehArmor =
-        (_faction getOrDefault ["vehiclesTanks", [], true])
-        + (_faction getOrDefault ["vehiclesAA", [], true])
-        + (_faction getOrDefault ["vehiclesArtillery", [], true])
-        + (_faction getOrDefault ["vehiclesLightAPCs", [], true])
-        + (_faction getOrDefault ["vehiclesAPCs", [], true])
-        + (_faction getOrDefault ["vehiclesLightTanks", [], true])
-        + (_faction getOrDefault ["vehiclesAirborne", [], true])
-        + (_faction getOrDefault ["vehiclesIFVs", [], true]);
-
+    private _vehArmor = (
+        (_faction getOrDefault ["vehiclesTanks", [], true]) +
+        (_faction getOrDefault ["vehiclesAA", [], true]) +
+        (_faction getOrDefault ["vehiclesArtillery", [], true]) +
+        (_faction getOrDefault ["vehiclesLightAPCs", [], true]) +
+        (_faction getOrDefault ["vehiclesAPCs", [], true]) +
+        (_faction getOrDefault ["vehiclesLightTanks", [], true]) +
+        (_faction getOrDefault ["vehiclesAirborne", [], true]) +
+        (_faction getOrDefault ["vehiclesIFVs", [], true])
+    );
     _faction set ["vehiclesArmor", _vehArmor];
 };
 
-// Load the optional extra normal AU factions after the base faction is ready.
-// Only do it for enemy sides.
-if (_factionPrefix in ["occ", "inv"]) then {
-    if (isNil "Thorne_CoalitionConfig") then {
-        call Thorne_fnc_initCoalition;
-    };
+if (_factionPrefix in ["occ", "inv"] && {missionNamespace getVariable ["Thorne_CoalitionEnabledNet", false]}) then {
     [_factionPrefix] call Thorne_fnc_loadCoalitionForSide;
 };
 
-_faction
+_faction;

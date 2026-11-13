@@ -85,8 +85,8 @@ diag_log format [
 ];
 
 private _loadSide = switch (_prefix) do {
-    case "occ": { Occupants };
-    case "inv": { Invaders };
+    case "occ": { west };
+    case "inv": { east };
     // A3AU's Rival loader verifies/registers against EAST/OPFOR classes.
     case "riv": { east };
     default { sideUnknown };

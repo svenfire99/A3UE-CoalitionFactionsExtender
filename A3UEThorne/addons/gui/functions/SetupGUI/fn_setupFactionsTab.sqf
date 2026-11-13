@@ -22,19 +22,15 @@ Return Value:
 
 */
 
-#include "\x\A3A\addons\gui\dialogues\ids.inc"
 #include "..\..\dialogues\ids.inc"
 #include "\x\A3A\addons\gui\dialogues\defines.hpp"
 #include "\x\A3A\addons\gui\dialogues\textures.inc"
 #include "..\..\script_component.hpp"
 FIX_LINE_NUMBERS()
 
-params ["_mode", "_params"];
+params [["_mode", "", [""]], ["_params", [], [[]]]];
 
 Debug_1("setupFactionsTab called with mode %1", _mode);
-if (_mode == "onLoad") then {
-    diag_log "[Thorne Coalition UI] setupFactionsTab AU-based override active";
-};
 
 private _display = findDisplay A3A_IDD_SETUPDIALOG;
 private _worldName = toLower worldName;
@@ -123,10 +119,27 @@ if (isNil {_display getVariable "isContentInitialized"}) then {
     _display setVariable ["isContentInitialized", true];
 };
 
+private _fnc_getSelectedData = {
+    params ["_listbox"];
+
+    private _selected = [];
+
+    for "_i" from 0 to ((lbSize _listbox) - 1) do {
+        if (_listbox lbIsSelected _i) then {
+            private _data = _listbox lbData _i;
+            if (_data != "") then {
+                _selected pushBackUnique _data;
+            };
+        };
+    };
+
+    _selected
+};
+
 switch (_mode) do
 {
     case ("update"): {
-        _params params ["_listboxes"];
+        _params params [["_listboxes", [], [[]]]];
 
         // ! look away now lest you have an aneurysm looking at all the duplicated code
         // ! not much to be done when the same items need to be accessed both from here and from inside the event handlers :(
@@ -291,14 +304,14 @@ switch (_mode) do
             private _addBoxCtrl = _display displayCtrl A3A_IDC_SETUP_ADDONCONTENT_BOX;
 
             private _dlcCGx = 124 * GRID_W;
-            private _dlcCGy = 26 * GRID_H;
+            private _dlcCGy = 30 * GRID_H;
             private _dlcCGw = 32 * GRID_W;
             private _dlcCGh = 22 * GRID_H;
 
             private _addCGx = 124 * GRID_W;
-            private _addCGy = 50 * GRID_H;
+            private _addCGy = 54 * GRID_H;
             private _addCGw = 32 * GRID_W;
-            private _addCGh = 46 * GRID_H;
+            private _addCGh = 42 * GRID_H;
             
             if (_mouseOver) then {
                 if (_dlcCGCtrl getVariable "Expanded") exitWith {};
@@ -342,14 +355,14 @@ switch (_mode) do
             private _addBoxCtrl = _display displayCtrl A3A_IDC_SETUP_ADDONCONTENT_BOX;
 
             private _dlcCGx = 124 * GRID_W;
-            private _dlcCGy = 26 * GRID_H;
+            private _dlcCGy = 30 * GRID_H;
             private _dlcCGw = 32 * GRID_W;
             private _dlcCGh = 22 * GRID_H;
 
             private _addCGx = 124 * GRID_W;
-            private _addCGy = 50 * GRID_H;
+            private _addCGy = 54 * GRID_H;
             private _addCGw = 32 * GRID_W;
-            private _addCGh = 46 * GRID_H;
+            private _addCGh = 42 * GRID_H;
             
             if (_mouseOver) then {
                 if (_addCGCtrl getVariable "Expanded") exitWith {};
@@ -378,578 +391,199 @@ switch (_mode) do
         _addCGCtrl setVariable ["LBHandler", _addCGHandler];
     };
 
-    case ("coalitionToggle"):
-    {
-        _params params ["_ctrl", "_checked"];
-
-        // Checkbox only controls whether OCC/INV/RIV are interpreted as
-        // multi-selection lists. The controls themselves are always LB_MULTI.
-        // Turning coalition mode off collapses each enemy list to one row.
-        if (_checked == 0) then {
-            {
-                private _list = _display displayCtrl _x;
-                private _sel = lbSelection _list;
-                private _keep = if (_sel isNotEqualTo []) then {
-                    _sel # 0
-                } else {
-                    (lbCurSel _list) max 0
-                };
-
-                {
-                    _list lbSetSelected [_x, false];
-                } forEach _sel;
-
-                _list lbSetSelected [_keep, true];
-                _list lbSetCurSel _keep;
-
-            } forEach [
-                A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-                A3A_IDC_SETUP_INVADERSLISTBOX,
-                A3A_IDC_SETUP_RIVALSLISTBOX
-            ];
-
-            missionNamespace setVariable [
-                "Thorne_CoalitionConfigNet",
-                [[], [], []],
-                true
-            ];
-        };
-    };
-
     case ("factionSelected"):
     {
         _params params ["_listbox", "_rowIndex"];
         if (_rowIndex == -1) exitWith {};
+        private _data = _listbox lbData _rowIndex;
+        if (_data == "") exitWith { _listbox lbSetCurSel (_listbox getVariable ["lastSel", 0]) };
+        _listbox setVariable ["lastSel", _rowIndex];
 
-        private _idc = ctrlIDC _listbox;
-        private _coalitionEnabled =
-            cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
-
-        private _isCoalitionList = _idc in [
+        private _multi = (ctrlIDC _listbox) in [
             A3A_IDC_SETUP_OCCUPANTSLISTBOX,
             A3A_IDC_SETUP_INVADERSLISTBOX,
             A3A_IDC_SETUP_RIVALSLISTBOX
         ];
+        if (!_multi) exitWith {};
 
-        // Preserve AU's normal single-select behavior outside coalition mode.
-        if (!_coalitionEnabled || {!_isCoalitionList}) exitWith {
-            if (_listbox lbData _rowIndex != "") then {
-                _listbox setVariable ["lastSel", _rowIndex];
-            } else {
-                _listbox lbSetCurSel (_listbox getVariable ["lastSel", 0]);
+        private _enabled = cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
+        private _selectedData = [_listbox] call _fnc_getSelectedData;
+        private _order = _listbox getVariable ["Thorne_selectionOrder", []];
+        if !(_order isEqualType []) then {
+            _order = [_order];
+        };
+        _order = _order select { _x in _selectedData };
+        {
+            _order pushBackUnique _x;
+        } forEach _selectedData;
+
+        if (!_enabled) then {
+            if (_data in _selectedData) then { _order = [_data] };
+            if (_order isEqualTo []) then { _order = [_data] };
+            for "_i" from 0 to (lbSize _listbox - 1) do {
+                _listbox lbSetSelected [_i, (_listbox lbData _i) == (_order#0)];
             };
         };
 
-        // LB_MULTI itself owns the selection state. We only remember the
-        // primary faction as the first valid selected config name.
-        private _selectedNames = (lbSelection _listbox) apply {
-            _listbox lbData _x
+        if (_order isEqualTo []) then {
+            _order = [_data];
+            _listbox lbSetSelected [_rowIndex, true];
         };
-        _selectedNames = _selectedNames select { _x != "" };
-
-        if (_selectedNames isEqualTo []) exitWith {};
-
-        private _primary = _listbox getVariable [
-            "Thorne_primaryFaction",
-            ""
-        ];
-
-        if !(_primary in _selectedNames) then {
-            _listbox setVariable [
-                "Thorne_primaryFaction",
-                _selectedNames # 0
-            ];
-        };
+        _listbox setVariable ["Thorne_selectionOrder", _order];
     };
 
     case ("fillFactions"):
     {
         private _expandLBs = [];
+        private _savedBundle = _display getVariable ["savedFactions", [[], [], []]];
+        _savedBundle params ["_savedFactions", "_savedAddons", "_savedDLC"];
+        if !(_savedFactions isEqualType []) then { _savedFactions = [] };
+        if (_savedFactions isEqualTo []) then { _savedFactions = ["", "", "", "", ""] };
+        while {count _savedFactions < 5} do { _savedFactions pushBack "" };
 
-        private _coalitionEnabled =
-            cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
-
-        private _savedCoalition = missionNamespace getVariable [
-            "Thorne_CoalitionConfigNet",
-            [[], [], []]
+        private _state = _display getVariable ["Thorne_setupState", createHashMap];
+        if !(_state isEqualType createHashMap) then { _state = createHashMap };
+        private _coalitionEnabled = _state getOrDefault ["coalitionEnabled", false];
+        private _selectedArrays = [
+            _state getOrDefault ["occupants", [_savedFactions#0]],
+            _state getOrDefault ["invaders", [_savedFactions#1]],
+            [_savedFactions#2],
+            [_savedFactions#3],
+            _state getOrDefault ["rivals", [_savedFactions#4]]
         ];
 
-        if ((count _savedCoalition) < 3) then {
-            _savedCoalition pushBack [];
-        };
-
         private _fnc_fillListBox = {
-            params [
-                "_listboxIDC",
-                "_factions",
-                "_selected",
-                ["_coalitionSelected", []]
-            ];
-
-            Debug_1("fillListBox called with %1 selected", _selected);
-
+            params ["_listboxIDC", "_factions", "_selected", ["_multi", false]];
             private _listbox = _display displayCtrl _listboxIDC;
-            private _isCoalitionList = _listboxIDC in [
-                A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-                A3A_IDC_SETUP_INVADERSLISTBOX,
-                A3A_IDC_SETUP_RIVALSLISTBOX
-            ];
-
-            if (_selected == "") then {
-                _selected = _listbox lbData lbCurSel _listbox;
+            private _selectedArray = if (_selected isEqualType []) then {+_selected} else {[_selected]};
+            _selectedArray = _selectedArray select {_x != ""};
+            if (_selectedArray isEqualTo []) then {
+                private _old = _listbox getVariable ["Thorne_selectionOrder", []];
+                if !(_old isEqualType []) then {
+                    _old = [_old];
+                };
+                if (_old isNotEqualTo []) then { _selectedArray = +_old };
             };
-
+            private _primary = _selectedArray param [0, ""];
             _listbox lbSetCurSel -1;
             lbClear _listbox;
-
             {
                 private _index = _listbox lbAdd getText(_x/"name");
-
                 if (_x call _fnc_factionLoaded) then {
                     _listbox lbSetPicture [_index, getText(_x/"flagTexture")];
                     _listbox lbSetPictureRight [_index, getText(_x/"logo")];
                     _listbox lbSetData [_index, configName _x];
                     _listbox lbSetTooltip [_index, getText(_x/"description")];
-
-                    if (
-                        _coalitionEnabled
-                        && {_isCoalitionList}
-                    ) then {
-                        if ((configName _x) in _coalitionSelected) then {
-                            _listbox lbSetSelected [_index, true];
-                        };
-                    } else {
-                        if (_selected == configName _x) then {
-                            _listbox lbSetCurSel _index;
-                        };
-                    };
+                    if ((configName _x) in _selectedArray) then { _listbox lbSetSelected [_index, true] };
+                    if (_primary == configName _x) then { _listbox lbSetCurSel _index };
                 } else {
                     _listbox lbSetPicture [_index, "a3\data_f\flags\flag_white_dmg_co.paa"];
                     _listbox lbSetPictureColor [_index, [1,1,1,0.3]];
-                    _listbox lbSetTooltip [_index, format [
-                        localize "STR_A3AP_setupFactionsTab_noLoaded",
-                        (getArray(_x/"requiredAddons")) joinString ", "
-                    ]];
+                    _listbox lbSetTooltip [_index, format[localize "STR_A3AP_setupFactionsTab_noLoaded", (getArray(_x/"requiredAddons")) joinString ", "]];
                     _listbox lbSetColor [_index, A3A_COLOR_TEXT_DARKER_SQF];
                     _listbox lbSetSelectColor [_index, A3A_COLOR_TEXT_DARKER_SQF];
                 };
             } forEach _factions;
-
-            if (
-                !_coalitionEnabled
-                || {!_isCoalitionList}
-            ) then {
-                if (lbCurSel _listbox == -1) then {
-                    _listbox lbSetCurSel 0;
-                };
+            if (lbCurSel _listbox == -1 && {lbSize _listbox > 0}) then {
+                _listbox lbSetCurSel 0;
+                _listbox lbSetSelected [0, true];
+                _selectedArray = [_listbox lbData 0];
             };
-
-            if (count _factions > 12) then {
-                _expandLBs pushBack _listbox;
+            if (!_multi && {lbCurSel _listbox >= 0}) then {
+                _selectedArray = [_listbox lbData lbCurSel _listbox];
             };
+            _listbox setVariable ["Thorne_selectionOrder", _selectedArray];
+            if (count _factions > 12) then { _expandLBs pushBack _listbox };
         };
 
-
-        // AU ORIGINAL FILTERING
         private _factions = +(_display getVariable "validFactions");
-
         if (!cbChecked (_display displayCtrl A3A_IDC_SETUP_IGNORECAMOCHECK)) then {
-            _factions = _factions apply {
-                _x select {
-                    getArray (_x/"climate") isEqualTo []
-                    or A3A_climate in getArray (_x/"climate")
-                }
-            };
+            _factions = _factions apply { _x select { getArray (_x/"climate") isEqualTo [] or A3A_climate in getArray (_x/"climate") } };
         };
-
-        private _missingFactions = _factions apply {
-            _x select { !(_x call _fnc_factionLoaded) }
-        };
-
-        _factions = _factions apply {
-            _x select { _x call _fnc_factionLoaded }
-        };
-
+        private _missingFactions = _factions apply { _x select { !(_x call _fnc_factionLoaded) } };
+        _factions = _factions apply { _x select { _x call _fnc_factionLoaded } };
         if (cbChecked (_display displayCtrl A3A_IDC_SETUP_SWITCHENEMYCHECK)) then {
-            _factions = [
-                _factions#1,
-                _factions#0,
-                _factions#2,
-                _factions#3,
-                _factions#4
-            ];
+            _factions = [_factions#1, _factions#0, _factions#2, _factions#3, _factions#4];
         };
-
         if (cbChecked (_display displayCtrl A3A_IDC_SETUP_ANYENEMYCHECK)) then {
-            _factions = [
-                _factions#0 + _factions#1,
-                _factions#1 + _factions#0,
-                _factions#2,
-                _factions#3,
-                _factions#4
-            ];
+            _factions = [_factions#0 + _factions#1, _factions#1 + _factions#0, _factions#2, _factions#3, _factions#4];
         };
 
-
-        // AU ORIGINAL saved primary factions
-        (_display getVariable "savedFactions") params [
-            "_savedFactions",
-            "_savedAddons",
-            "_savedDLC"
-        ];
-
-        Debug_3(
-            "Saved factions: %1 Addons: %2 DLC: %3",
-            _savedFactions,
-            _savedAddons,
-            _savedDLC
-        );
-
-        private _failedFactions = [];
-
-        {
-            private _sfact =
-                A3A_SETUP_CONFIGFILE
-                / "A3A"
-                / "Templates"
-                / _x;
-
-            if !(isClass _sfact) then {
-                Info_1("Bad saved faction name %1", _x);
-                _failedFactions pushBack _x;
-                continue;
-            };
-
-            if !(_sfact call _fnc_factionLoaded) then {
-                Info_1("Saved faction %1 not loadable", _x);
-                _failedFactions pushBack _x;
-                continue;
-            };
-
-            _factions#_forEachIndex pushBackUnique _sfact;
-
-        } forEach _savedFactions;
-
-
-        // A3UE addition: do the same thing for saved coalition extras.
+        // Ensure every saved coalition member remains visible if its requirements are loaded.
+        private _failed = [];
         {
             private _bucket = _forEachIndex;
-
             {
-                if (_x isEqualType [] && {count _x > 0}) then {
-                    private _configName = _x # 0;
-
-                    private _cfg =
-                        A3A_SETUP_CONFIGFILE
-                        / "A3A"
-                        / "Templates"
-                        / _configName;
-
-                    if (
-                        isClass _cfg
-                        && {_cfg call _fnc_factionLoaded}
-                    ) then {
-                        _factions#_bucket pushBackUnique _cfg;
-                    };
-                };
+                private _cfg = A3A_SETUP_CONFIGFILE/"A3A"/"Templates"/_x;
+                if !(isClass _cfg) then { _failed pushBackUnique _x; continue };
+                if !(_cfg call _fnc_factionLoaded) then { _failed pushBackUnique _x; continue };
+                (_factions#_bucket) pushBackUnique _cfg;
             } forEach _x;
-
-        } forEach [
-            _savedCoalition param [0, []],
-            _savedCoalition param [1, []],
-            _savedCoalition param [2, []]
-        ];
-
-
-        if (_failedFactions isNotEqualTo []) then {
+        } forEach _selectedArrays;
+        if (_failed isNotEqualTo []) then {
             private _msg = "Couldn't load factions from save:";
-            {
-                _msg = _msg + endl + _x
-            } forEach _failedFactions;
-
+            { _msg = _msg + endl + _x } forEach _failed;
             ["Setup", _msg] spawn A3A_fnc_customHint;
         };
-
         if (cbChecked (_display displayCtrl A3A_IDC_SETUP_SHOWMISSINGCHECK)) then {
-            {
-                _x append _missingFactions#_forEachIndex
-            } forEach _factions;
+            { _x append _missingFactions#_forEachIndex } forEach _factions;
         };
 
-        if (_savedFactions isEqualTo []) then {
-            _savedFactions = ["", "", "", "", ""]
-        };
-
-
-        private _occSelected = [_savedFactions#0];
-        private _invSelected = [_savedFactions#1];
-        private _rivSelected = [_savedFactions#4];
-
-        {
-            if (_x isEqualType [] && {count _x > 0}) then {
-                _occSelected pushBackUnique (_x # 0);
-            };
-        } forEach (_savedCoalition param [0, []]);
-
-        {
-            if (_x isEqualType [] && {count _x > 0}) then {
-                _invSelected pushBackUnique (_x # 0);
-            };
-        } forEach (_savedCoalition param [1, []]);
-
-        {
-            if (_x isEqualType [] && {count _x > 0}) then {
-                _rivSelected pushBackUnique (_x # 0);
-            };
-        } forEach (_savedCoalition param [2, []]);
-
-
-        [
-            A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-            _factions#0,
-            _savedFactions#0,
-            _occSelected
-        ] call _fnc_fillListBox;
-
-        [
-            A3A_IDC_SETUP_INVADERSLISTBOX,
-            _factions#1,
-            _savedFactions#1,
-            _invSelected
-        ] call _fnc_fillListBox;
-
-        [
-            A3A_IDC_SETUP_REBELSLISTBOX,
-            _factions#2,
-            _savedFactions#2
-        ] call _fnc_fillListBox;
-
-        [
-            A3A_IDC_SETUP_CIVILIANSLISTBOX,
-            _factions#3,
-            _savedFactions#3
-        ] call _fnc_fillListBox;
-
-        [
-            A3A_IDC_SETUP_RIVALSLISTBOX,
-            _factions#4,
-            _savedFactions#4,
-            _rivSelected
-        ] call _fnc_fillListBox;
-
-
-        // Store explicit primary values for coalition getFactions.
-        (_display displayCtrl A3A_IDC_SETUP_OCCUPANTSLISTBOX)
-            setVariable ["Thorne_primaryFaction", _savedFactions#0];
-
-        (_display displayCtrl A3A_IDC_SETUP_INVADERSLISTBOX)
-            setVariable ["Thorne_primaryFaction", _savedFactions#1];
-
-        (_display displayCtrl A3A_IDC_SETUP_RIVALSLISTBOX)
-            setVariable ["Thorne_primaryFaction", _savedFactions#4];
-
-
+        [A3A_IDC_SETUP_OCCUPANTSLISTBOX, _factions#0, _selectedArrays#0, true] call _fnc_fillListBox;
+        [A3A_IDC_SETUP_INVADERSLISTBOX, _factions#1, _selectedArrays#1, true] call _fnc_fillListBox;
+        [A3A_IDC_SETUP_REBELSLISTBOX, _factions#2, _selectedArrays#2, false] call _fnc_fillListBox;
+        [A3A_IDC_SETUP_CIVILIANSLISTBOX, _factions#3, _selectedArrays#3, false] call _fnc_fillListBox;
+        [A3A_IDC_SETUP_RIVALSLISTBOX, _factions#4, _selectedArrays#4, true] call _fnc_fillListBox;
         ["update", [_expandLBs]] call A3A_fnc_setupFactionsTab;
     };
 
+    case ("coalitionToggle"):
+    {
+        private _enabled = cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
+        {
+            private _lb = _display displayCtrl _x;
+            private _selected = [_lb] call _fnc_getSelectedData;
+            private _order = _lb getVariable ["Thorne_selectionOrder", []];
+            if !(_order isEqualType []) then {
+                _order = [_order];
+            };
+            _order = _order select {_x in _selected};
+            { _order pushBackUnique _x } forEach _selected;
+            if (!_enabled && {_order isNotEqualTo []}) then {
+                _order resize 1;
+                for "_i" from 0 to (lbSize _lb - 1) do { _lb lbSetSelected [_i, (_lb lbData _i) == (_order#0)] };
+            };
+            _lb setVariable ["Thorne_selectionOrder", _order];
+        } forEach [A3A_IDC_SETUP_OCCUPANTSLISTBOX, A3A_IDC_SETUP_INVADERSLISTBOX, A3A_IDC_SETUP_RIVALSLISTBOX];
+    };
 
     case ("getFactions"):
     {
-        private _coalitionEnabled =
-            cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
-
-        private _enemyIDCs = [
-            A3A_IDC_SETUP_OCCUPANTSLISTBOX,
-            A3A_IDC_SETUP_INVADERSLISTBOX,
-            A3A_IDC_SETUP_RIVALSLISTBOX
-        ];
-
-        private _allSelections = [];
-
-        {
-            private _ctrl = _display displayCtrl _x;
-
-            private _names = if (_coalitionEnabled) then {
-                (lbSelection _ctrl) apply {
-                    _ctrl lbData _x
-                }
-            } else {
-                [_ctrl lbData lbCurSel _ctrl]
+        private _primary = {
+            params ["_idc"];
+            private _lb = _display displayCtrl _idc;
+            private _order = _lb getVariable ["Thorne_selectionOrder", []];
+            if !(_order isEqualType []) then {
+                _order = [_order];
             };
-
-            _names = _names select { _x != "" };
-
-            if (_names isEqualTo []) then {
-                _names = [_ctrl lbData 0];
-            };
-
-            _allSelections pushBack _names;
-        } forEach _enemyIDCs;
-
-
-        diag_log format [
-            "[Thorne Coalition UI] selection counts OCC=%1 INV=%2 RIV=%3 raw=%4",
-            count (_allSelections # 0),
-            count (_allSelections # 1),
-            count (_allSelections # 2),
-            _allSelections
-        ];
-
-        private _fnc_primary = {
-            params [
-                "_ctrl",
-                "_selected"
-            ];
-
-            private _primary = _ctrl getVariable [
-                "Thorne_primaryFaction",
-                ""
-            ];
-
-            if !(_primary in _selected) then {
-                _primary = _selected # 0;
-                _ctrl setVariable [
-                    "Thorne_primaryFaction",
-                    _primary
-                ];
-            };
-
-            _primary
+            if (_order isNotEqualTo []) exitWith {_order#0};
+            if (lbCurSel _lb >= 0) exitWith {_lb lbData lbCurSel _lb};
+            ""
         };
-
-
-        private _occCtrl =
-            _display displayCtrl A3A_IDC_SETUP_OCCUPANTSLISTBOX;
-        private _invCtrl =
-            _display displayCtrl A3A_IDC_SETUP_INVADERSLISTBOX;
-        private _rivCtrl =
-            _display displayCtrl A3A_IDC_SETUP_RIVALSLISTBOX;
-
-        private _mainOcc = [
-            _occCtrl,
-            _allSelections#0
-        ] call _fnc_primary;
-
-        private _mainInv = [
-            _invCtrl,
-            _allSelections#1
-        ] call _fnc_primary;
-
-        private _mainRiv = [
-            _rivCtrl,
-            _allSelections#2
-        ] call _fnc_primary;
-
-
-        // AU still receives exactly five primary faction config names.
-        private _factions = [
-            _mainOcc,
-            _mainInv,
-
-            (_display displayCtrl A3A_IDC_SETUP_REBELSLISTBOX)
-                lbData
-                lbCurSel (_display displayCtrl A3A_IDC_SETUP_REBELSLISTBOX),
-
-            (_display displayCtrl A3A_IDC_SETUP_CIVILIANSLISTBOX)
-                lbData
-                lbCurSel (_display displayCtrl A3A_IDC_SETUP_CIVILIANSLISTBOX),
-
-            _mainRiv
-        ];
-
-
-        private _fnc_buildExtras = {
-            params [
-                "_selected",
-                "_main"
-            ];
-
-            if (!_coalitionEnabled) exitWith {
-                []
-            };
-
-            private _extras = _selected - [_main];
-            private _result = [];
-
-            {
-                private _cfg =
-                    A3A_SETUP_CONFIGFILE
-                    / "A3A"
-                    / "Templates"
-                    / _x;
-
-                if !(isClass _cfg) then {
-                    continue;
-                };
-
-                private _basePath = getText (_cfg / "basepath");
-                private _file = getText (_cfg / "file");
-
-                if (_basePath == "" || {_file == ""}) then {
-                    continue;
-                };
-
-                private _path = if (
-                    (toLower _file) select [
-                        ((count _file) - 4) max 0
-                    ] == ".sqf"
-                ) then {
-                    format ["%1\%2", _basePath, _file]
-                } else {
-                    format ["%1\%2.sqf", _basePath, _file]
-                };
-
-                _result pushBack [
-                    _x,
-                    _path
-                ];
-
-            } forEach _extras;
-
-            _result
+        private _single = {
+            params ["_idc"];
+            private _lb = _display displayCtrl _idc;
+            if (lbCurSel _lb < 0) exitWith {""};
+            _lb lbData lbCurSel _lb
         };
-
-
-        private _coalitionConfig = [
-            [
-                _allSelections#0,
-                _mainOcc
-            ] call _fnc_buildExtras,
-
-            [
-                _allSelections#1,
-                _mainInv
-            ] call _fnc_buildExtras,
-
-            [
-                _allSelections#2,
-                _mainRiv
-            ] call _fnc_buildExtras
-        ];
-
-        missionNamespace setVariable [
-            "Thorne_CoalitionConfigNet",
-            _coalitionConfig,
-            true
-        ];
-
-        missionNamespace setVariable [
-            "Thorne_CoalitionEnabledNet",
-            _coalitionEnabled,
-            true
-        ];
-
-        diag_log format [
-            "[Thorne Coalition UI] getFactions enabled=%1 primary=%2 selections=%3 config=%4",
-            _coalitionEnabled,
-            [_mainOcc, _mainInv, _mainRiv],
-            _allSelections,
-            _coalitionConfig
-        ];
-
-        _factions;
+        [
+            [A3A_IDC_SETUP_OCCUPANTSLISTBOX] call _primary,
+            [A3A_IDC_SETUP_INVADERSLISTBOX] call _primary,
+            [A3A_IDC_SETUP_REBELSLISTBOX] call _single,
+            [A3A_IDC_SETUP_CIVILIANSLISTBOX] call _single,
+            [A3A_IDC_SETUP_RIVALSLISTBOX] call _primary
+        ]
     };
-
 
     case ("getContent"):
     {

@@ -9,7 +9,7 @@
 */
 
 params ["_unit", ["_marker", ""], "_isSpawner", "_resPool"];
-#include "\x\A3A\addons\core\script_component.hpp"
+#include "..\..\script_component.hpp"
 FIX_LINE_NUMBERS()
 
 //TODO we may want to rename that file to AIinit or something
@@ -23,37 +23,20 @@ private _side = side (group _unit);
 private _isRival = _unit getVariable ["isRival", false];
 private _unitPrefix = _unit getVariable ["unitPrefix", ""];
 private _faction = Faction(_side);
-private _thorneCoalitionFactionFound = false;
-
-// Coalition aliases are registered with an exact type -> faction map.
-// This does not care whether Occupants/Invaders are WEST/EAST, so
-// "Switch enemy sides" cannot change the identity result.
 if (!isNil "Thorne_CoalitionTypeFactionMap" && {!isNil "_type"}) then {
-    private _coalitionFaction = Thorne_CoalitionTypeFactionMap getOrDefault [
-        _type,
-        createHashMap
-    ];
-
-    if (
-        _coalitionFaction isEqualType createHashMap
-        && {count _coalitionFaction > 0}
-    ) then {
-        _faction = _coalitionFaction;
-        _thorneCoalitionFactionFound = true;
-
-        diag_log format [
-            "[Thorne Coalition Identity] NATOinit type='%1' faction='%2' side=%3",
-            _type,
-            _faction getOrDefault ["name", "UNKNOWN"],
-            _side
-        ];
+    private _sourceFaction = Thorne_CoalitionTypeFactionMap getOrDefault [_type, createHashMap];
+    if (_sourceFaction isEqualType createHashMap && {count _sourceFaction > 0}) then {
+        _faction = _sourceFaction;
     };
 };
-
 _unit setVariable ["originalSide", _side];          // used for delete handler, which is local
 
 if (isNil "_type") then {
-    Warning_2("Unit does not have a type assigned: %1, vehicle: %2", typeOf _unit, typeOf vehicle _unit);
+    diag_log format [
+        "[A3UEThorne Coalition] NATOinit: Unit does not have a type assigned: %1, vehicle: %2",
+        typeOf _unit,
+        typeOf vehicle _unit
+    ];
     _type = typeOf _unit;
 };
 
@@ -127,22 +110,16 @@ private _face = nil;
 private _voice = nil;
 private _insignia = nil;
 
-if (_isRival && {!_thorneCoalitionFactionFound}) then {
-    _regularFaces = A3A_faction_riv get "faces";
-    _regularVoices = A3A_faction_riv get "voices";
-    _regularInsignia = A3A_faction_riv get "insignia";
-} else {
-    _regularFaces = _faction get "faces";
-    _regularVoices = _faction get "voices";
-    _regularInsignia = _faction get "insignia";
-};
+_regularFaces = _faction get "faces";
+_regularVoices = _faction get "voices";
+_regularInsignia = _faction get "insignia";
 
 switch (true) do {
     case (_isRival): {
         _skill = _skill * 0.9;
-        _face = selectRandom _regularFaces;
-        _voice = selectRandom _regularVoices;
-        _insignia = selectRandom _regularInsignia;
+        _face = selectRandom (_faction get "faces");
+        _voice = selectRandom (_faction get "voices");
+        _insignia = selectRandom (_faction getOrDefault ["insignia", []]);
     };
     case (_unitPrefix isEqualTo "militia"): {
         _skill = _skill * 0.7;
@@ -178,8 +155,13 @@ switch (true) do {
         _insignia = selectRandom _regularInsignia;
     };
 };
-[_unit, createHashMapFromArray [["face", _face], ["speaker", _voice], ["pitch", (random [0.9, 1, 1.1])]]] call A3A_fnc_setIdentity;
+private _identity = [_faction, _type] call A3A_fnc_createRandomIdentity;
+_identity set ["face", _face];
+_identity set ["speaker", _voice];
+_identity set ["pitch", (random [0.9, 1, 1.1])];
+[_unit, _identity] call A3A_fnc_setIdentity;
 _unit setSkill _skill;
+[_unit, ""] call BIS_fnc_setUnitInsignia;
 if (!isNil "_insignia" && {_insignia isNotEqualTo ""}) then {
    [_unit, _insignia] call BIS_fnc_setUnitInsignia;
 };
@@ -306,4 +288,10 @@ if (_unit == gunner objectParent _unit or {(secondaryWeapon _unit) in allAA}) th
         if (!isNull driver _x) then { _unit reveal [_x, 1.5] };
     } forEach (_unit nearEntities ["Air", distanceSPWN*1]);
 };
-["AIInit", [_unit, _side, _marker, _unit getVariable "spawner"]] call EFUNC(Events,triggerEvent);
+
+[
+    "A3A_event_serverInitAiUnit",
+    [_unit, _side, _marker, _unit getVariable "spawner"]
+] call A3A_fnc_triggerServerEvent;
+
+nil;

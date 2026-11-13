@@ -5,36 +5,12 @@
 */
 
 // Optional (new) save vars used by the selector
-private _optionalVars = [
-    "name",
-    "version",
-    "saveTime",
-    "ended",
-    "params",
-    "factions",
-    "DLC",
-    "addonVics",
-    "Thorne_coalitionEnabled",
-    "Thorne_coalitionConfig",
-    "Thorne_factionOverrides"
-];
+private _optionalVars = ["name", "version", "saveTime", "ended", "params", "factions", "DLC", "addonVics", "saveDataPlugins", "Thorne_coalitionEnabled", "Thorne_coalitionConfig", "Thorne_factionOverrideMask", "Thorne_CoalitionEnabled", "Thorne_CoalitionConfig", "Thorne_FactionOverrideMask"];
 
 private _fnc_gameMissing = { isNil {"membersX" call A3A_fnc_returnSavedStat} };
 private _saveData = [];
 private _campaignIDs = [];
 private _serverID = profileNameSpace getVariable ["ss_ServerID",""];
-
-private _fnc_logThorneRead = {
-    params ["_game"];
-
-    diag_log format [
-        "[Thorne Save READ] gameID='%1' enabled=%2 config=%3 overrides=%4",
-        _game getOrDefault ["gameID", ""],
-        _game getOrDefault ["Thorne_coalitionEnabled", false],
-        _game getOrDefault ["Thorne_coalitionConfig", [[], [], []]],
-        _game getOrDefault ["Thorne_factionOverrides", [false, false, false]]
-    ];
-};
 
 // Old Plus saves
 private _saveList = [profileNamespace getVariable "antistasiUltimate2SavedGames"] param [0, [], [[]]];
@@ -47,9 +23,13 @@ private _saveList = [profileNamespace getVariable "antistasiUltimate2SavedGames"
 
     private _game = createHashMapFromArray [["serverID", _serverID], ["gameID", _cid], ["map", _map]];
     { _game set [_x, _x call A3A_fnc_returnSavedStat] } forEach _optionalVars;
-    [_game] call _fnc_logThorneRead;
-    _saveData pushBack _game;
 
+    // backwards compatibility for older "new" save formats
+    if (_game getOrDefault["params", createHashMap, true] isEqualType []) then {
+        _game set["params", createHashMapFromArray(_game get "params")];
+    };
+
+    _saveData pushBack _game;
 } forEach _saveList;
 
 private _oldCampaignID = profileNameSpace getVariable ["ss_CampaignID", ""];
@@ -69,9 +49,13 @@ private _saveList2 = [missionProfileNamespace getVariable "antistasiUltimate2Sav
 
     private _game = createHashMapFromArray [["serverID", false], ["gameID", _cid], ["map", _map]];
     { _game set [_x, _x call A3A_fnc_returnSavedStat] } forEach _optionalVars;
-    [_game] call _fnc_logThorneRead;
-    _saveData pushBack _game;
 
+    // backwards compatibility for older "new" save formats
+    if (_game getOrDefault["params", createHashMap, true] isEqualType []) then {
+        _game set["params", createHashMapFromArray(_game get "params")];
+    };
+
+    _saveData pushBack _game;
 } forEach _saveList2;
 
 reverse _saveData;          // return newest games at the top

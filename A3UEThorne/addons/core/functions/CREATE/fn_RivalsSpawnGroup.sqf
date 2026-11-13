@@ -1,25 +1,13 @@
-#include "\x\A3A\addons\core\script_component.hpp"
+#include "..\..\script_component.hpp"
 FIX_LINE_NUMBERS()
 
 params ["_positionX","_sideX","_typesX"];
 
 private _groupX = createGroup _sideX;
-
-// A3UE: choose one Rival coalition member for the whole group.
-private _coalitionTag = [
-    _groupX,
-    "riv",
-    _typesX
-] call Thorne_fnc_selectCoalitionForGroup;
-
-private _resolvedTypes = _typesX apply {
-    [
-        _groupX,
-        "riv",
-        _x
-    ] call Thorne_fnc_resolveCoalitionType
+private _prefix = "riv";
+if (missionNamespace getVariable ["Thorne_CoalitionEnabledNet", false]) then {
+    [_groupX, _prefix, _typesX] call Thorne_fnc_selectCoalitionForGroup;
 };
-
 private _ranks = ["LIEUTENANT","SERGEANT","CORPORAL"];
 private _countX = count _typesX;
 
@@ -34,31 +22,16 @@ private _countRanks = (count _ranks - 1);
 
 Debug_2("Side: %1 spawning group composition: %2", _sideX, _typesX);
 
-diag_log format [
-    "[Thorne Coalition Rivals] spawnGroup tag='%1' original=%2 resolved=%3",
-    _coalitionTag,
-    _typesX,
-    _resolvedTypes
-];
-
 for "_i" from 0 to (_countX - 1) do {
-    private _requestedType = _typesX select _i;
-    private _resolvedType = _resolvedTypes select _i;
-
-	_unit = [_groupX, _resolvedType, _positionX, [], 0, "NONE"] call A3A_fnc_createUnit;
+	private _requestedType = _typesX select _i;
+    private _resolvedType = [_groupX, _prefix, _requestedType] call Thorne_fnc_resolveCoalitionType;
+    _unit = [_groupX, _resolvedType, _positionX, [], 0, "NONE"] call A3A_fnc_createUnit;
 	_unit allowDamage false;
 
 	if (_i <= _countRanks) then { 
 		_unit setRank (_ranks select _i) 
 	};
-	if (
-        _requestedType in (
-            A3A_faction_riv getOrDefault [
-                "SquadLeaders",
-                []
-            ]
-        )
-    ) then {
+	if ((_typesX select _i) in FactionGet(all,"SquadLeaders")) then {
 		_groupX selectLeader _unit
 	};
 	sleep 0.25;

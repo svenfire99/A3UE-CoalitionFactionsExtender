@@ -1,30 +1,17 @@
 #include "script_component.hpp"
 
-class CfgPatches 
+class CfgPatches
 {
-    class ADDON 
+    class A3UEThorne_core
     {
-        name = COMPONENT_NAME;
+        name = "A3UEThorne - Faction Coalitions";
         units[] = {};
         weapons[] = {};
-        requiredVersion = REQUIRED_VERSION;
-        requiredAddons[] = {"A3A_core", "A3A_ultimate"};
-        author = AUTHOR;
-        authors[] = { AUTHORS };
-        authorUrl = "";
-        VERSION_CONFIG;
+        requiredVersion = 2.18;
+        requiredAddons[] = {"A3A_core", "A3A_ultimate", "A3A_bazaar"};
+        author = "ThorneOfCallisto";
+        A3A_compatibility[] = {12, 4};
     };
 };
 
-class A3A 
-{
-    #if __A3_DEBUG__
-        #include "CfgFunctions.hpp"
-    #endif
-};
-
-#if __A3_DEBUG__
-#else
-    #include "CfgFunctions.hpp"
-#endif
-
+#include "cfgFunctions.hpp"
