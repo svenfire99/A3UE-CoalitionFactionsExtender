@@ -1,8 +1,8 @@
 class CfgPatches
 {
-    class A3UE_coalition_gui
+    class A3UEThorne_coalition_gui
     {
-        name = "A3UE Coalition GUI";
+        name = "A3UEThorne Coalition GUI";
         units[] = {};
         weapons[] = {};
         requiredVersion = 2.18;
@@ -10,9 +10,9 @@ class CfgPatches
         {
             "A3A_gui",
             "A3A_ultimate",
-            "A3UE_core"
+            "A3UEThorne_core"
         };
-        author = "ThorneOfCallisto";
+        author = "SvenBrandt99";
     };
 };
 
