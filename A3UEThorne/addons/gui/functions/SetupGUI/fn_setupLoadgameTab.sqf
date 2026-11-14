@@ -328,9 +328,29 @@ switch (_mode) do
             _factions#4
         ] call _getOrder;
 
+        private _coalitionCtrl =
+            _display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK;
+
+        private _hasMultipleSelections =
+            (count _occSelection > 1)
+            || {count _invSelection > 1}
+            || {count _rivSelection > 1};
+
+        private _coalitionEnabled =
+            cbChecked _coalitionCtrl
+            || {_hasMultipleSelections};
+
+        // Multi-selection and coalition-disabled are contradictory states.
+        // Normalise the GUI immediately so the saved state always matches
+        // what the player actually selected.
+        if (_hasMultipleSelections && {!cbChecked _coalitionCtrl}) then {
+            _coalitionCtrl cbSetChecked true;
+            diag_log "[A3UEThorne Coalition] auto-enabled coalition because multiple factions are selected";
+        };
+
         private _setupState = createHashMapFromArray [
             ["version", 2],
-            ["coalitionEnabled", cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK)],
+            ["coalitionEnabled", _coalitionEnabled],
             ["occupants", _occSelection],
             ["invaders", _invSelection],
             ["rivals", _rivSelection],

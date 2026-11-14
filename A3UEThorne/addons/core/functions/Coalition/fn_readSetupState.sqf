@@ -45,17 +45,44 @@ if !(_plugins isEqualType createHashMap) then { _plugins = createHashMap };
 // Current clean format.
 private _current = _plugins getOrDefault ["A3UEThorne_Setup", createHashMap];
 if (_current isEqualType createHashMap && {count _current > 0}) exitWith {
-    private _result = createHashMapFromArray [
+    private _occ = [
+        _baseFactions#0,
+        _current getOrDefault ["occupants", []]
+    ] call _withPrimary;
+
+    private _inv = [
+        _baseFactions#1,
+        _current getOrDefault ["invaders", []]
+    ] call _withPrimary;
+
+    private _riv = [
+        _baseFactions#4,
+        _current getOrDefault ["rivals", []]
+    ] call _withPrimary;
+
+    private _hasMultiple =
+        (count _occ > 1)
+        || {count _inv > 1}
+        || {count _riv > 1};
+
+    private _enabled =
+        (_current getOrDefault ["coalitionEnabled", false])
+        || {_hasMultiple};
+
+    if (_hasMultiple && {!(_current getOrDefault ["coalitionEnabled", false])}) then {
+        diag_log "[A3UEThorne Coalition] normalized inconsistent save: multiple factions imply coalitionEnabled=true";
+    };
+
+    createHashMapFromArray [
         ["version", 2],
-        ["coalitionEnabled", _current getOrDefault ["coalitionEnabled", false]],
-        ["occupants", [_baseFactions#0, _current getOrDefault ["occupants", []]] call _withPrimary],
-        ["invaders", [_baseFactions#1, _current getOrDefault ["invaders", []]] call _withPrimary],
-        ["rivals", [_baseFactions#4, _current getOrDefault ["rivals", []]] call _withPrimary],
+        ["coalitionEnabled", _enabled],
+        ["occupants", _occ],
+        ["invaders", _inv],
+        ["rivals", _riv],
         ["switchEnemySides", _current getOrDefault ["switchEnemySides", false]],
         ["overrideSideLimits", _current getOrDefault ["overrideSideLimits", false]],
         ["overrideCamoLimits", _current getOrDefault ["overrideCamoLimits", false]]
-    ];
-    _result
+    ]
 };
 
 // Transitional v2 plugin format from the 12.4 rebase attempts.
@@ -94,6 +121,16 @@ if (_mask isEqualType 0) then {
     _state set ["switchEnemySides", (_mask mod 2) >= 1];
     _state set ["overrideSideLimits", (floor (_mask / 2) mod 2) >= 1];
     _state set ["overrideCamoLimits", (floor (_mask / 4) mod 2) >= 1];
+};
+
+// Final safety normalization for legacy/transitional formats.
+private _legacyHasMultiple =
+    (count (_state getOrDefault ["occupants", []]) > 1)
+    || {count (_state getOrDefault ["invaders", []]) > 1}
+    || {count (_state getOrDefault ["rivals", []]) > 1};
+
+if (_legacyHasMultiple) then {
+    _state set ["coalitionEnabled", true];
 };
 
 _state

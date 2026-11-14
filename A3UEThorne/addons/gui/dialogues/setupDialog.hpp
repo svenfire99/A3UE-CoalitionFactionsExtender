@@ -688,3 +688,285 @@ class A3A_SetupDialog : A3A_TabbedDialog
 
     };
 };
+
+class A3A_SetupDialog_InGame : A3A_SetupDialog
+{
+    class ControlsBackground : ControlsBackground
+    {
+        delete TitleBarBackground;
+        class TabsBackground : TabsBackground {};
+        class Background : Background {};
+    };
+
+    class Controls : Controls
+    {
+        delete TitlebarText;
+
+        class TabButtons : TabButtons
+        {
+            class Controls : Controls
+            {
+                class ParamsTabText : A3A_Text
+                {
+                    idc = A3A_IDC_SETUP_SAVEINFOTEXT;
+                    x = 0;
+                    y = 0;
+                    w = 122 * GRID_W;
+                    h = 5 * GRID_H;
+                    colorBackground[] = A3A_COLOR_BUTTON_BACKGROUND;
+                    style = ST_CENTER;
+                    font = A3A_BUTTON_FONT;
+                    text = $STR_antistasi_dialogs_setup_params_tab_button;
+                };
+
+                class ParamsTabButton : A3A_Button
+                {
+                    idc = A3A_IDC_SETUP_PARAMSTABBUTTON;
+                    text = $STR_antistasi_dialogs_hq_button_rebel_set_loadout_button;
+                    onButtonClick = "['SaveParams'] spawn SCRT_fnc_ui_editParamsMenu;";
+                    x = 122 * GRID_W;
+                    y = 0;
+                    w = 38 * GRID_W;
+                    h = 5 * GRID_H;
+                };
+            };
+        };
+
+        delete LoadgameTab;
+        delete FactionsTab;
+        delete ContentTab;
+        class ParamsTab : ParamsTab {};
+    };
+};
+
+class A3A_SetupHQPosDialog
+{
+    idd = A3A_IDD_SETUPHQPOSDIALOG;
+    onLoad = "['onLoad'] spawn A3A_fnc_setupHQPosDialog";
+    onUnload = "['onUnload'] call A3A_fnc_setupHQPosDialog";
+
+    class ControlsBackground
+    {
+        class HQMap : A3A_MapControl
+        {
+            idc = -1;
+            onMouseButtonUp = "['mouseUp', _this] spawn A3A_fnc_setupHQPosDialog";
+            x = safeZoneX;
+            y = safeZoneY;
+            w = safeZoneW;
+            h = safeZoneH;
+        };
+    };
+    class Controls
+    {
+        class CloseButton : A3A_Button
+        {
+            idc = -1;
+            text = $STR_antistasi_dialogs_hqpos_close;
+            onButtonClick = "closeDialog 0";
+            x = safeZoneX;
+            y = safeZoneY;
+            w = 30 * GRID_W;
+            h = 6 * GRID_H;
+        };
+    };
+};
+
+class A3A_TextMultiCenter: A3A_Text
+{
+    style = ST_CENTER + ST_MULTI + ST_NO_RECT;
+};
+
+class A3A_SetupConfirmDialog
+{
+    idd = A3A_IDD_SETUPCONFIRMDIALOG;
+    onLoad = "['onLoad'] spawn A3A_fnc_setupConfirmDialog";
+    //onUnload = "['onUnload'] call A3A_fnc_setupConfirmDialog";        // nothing to do on cancel?
+
+    #define DIALOG_X CENTER_X(80) // Global x pos of dialog
+    #define DIALOG_Y CENTER_Y(40) // Global y pos of dialog
+
+    class Controls
+    {
+        class Titlebar : A3A_TitlebarText
+        {
+            idc = -1;
+            text = $STR_antistasi_dialogs_setup_confirm_title;
+            colorBackground[] = A3A_COLOR_TITLEBAR_BACKGROUND;
+            x = DIALOG_X;
+            y = DIALOG_Y - 5 * GRID_H;
+            w = 80 * GRID_W;
+            h = 5 * GRID_H;
+        };
+        class Background : A3A_Background
+        {
+            idc = -1;
+            x = DIALOG_X;
+            y = DIALOG_Y;
+            w = 80 * GRID_W;
+            h = 44 * GRID_H;
+        };
+        class ConfirmText : A3A_TextMultiCenter
+        {
+            idc = A3A_IDC_SETUP_CONFIRMTEXT;
+            x = DIALOG_X + 4 * GRID_W;
+            y = DIALOG_Y + 4 * GRID_H;
+            w = 72 * GRID_W;
+            h = 24 * GRID_H;
+        };
+        class CancelButton : A3A_Button
+        {
+            idc = A3A_IDC_SETUP_CONFIRMCANCEL;
+            text = $STR_antistasi_dialogs_setup_confirm_cancel;
+            onButtonClick = "closeDialog 0";
+            x = DIALOG_X + 4 * GRID_W;
+            y = DIALOG_Y + 28 * GRID_H;
+            w = 30 * GRID_W;
+            h = 5 * GRID_H;
+        };
+        class YesButton : A3A_Button
+        {
+            idc = A3A_IDC_SETUP_CONFIRMYES;
+            text = $STR_antistasi_dialogs_setup_confirm_yes;
+            onButtonClick = "['confirm'] call A3A_fnc_setupConfirmDialog";
+            x = DIALOG_X + 46 * GRID_W;
+            y = DIALOG_Y + 28 * GRID_H;
+            w = 30 * GRID_W;
+            h = 5 * GRID_H;
+        };
+    };
+};
+
+class A3A_SetupEditZonesDialog : A3A_SetupHQPosDialog
+{
+    idd = A3A_IDD_EDITZONES_DIALOG;
+    onLoad = "['onLoad'] spawn A3A_fnc_setupEditZonesDialog";
+    onUnload = "['onUnload'] call A3A_fnc_setupEditZonesDialog";
+
+    class ControlsBackground : ControlsBackground
+    {
+        class HQMap : HQMap
+        {
+            idc = -1;
+            onMouseButtonUp = "['mouseUp', _this] spawn A3A_fnc_setupEditZonesDialog";
+            x = safeZoneX;
+            y = safeZoneY;
+            w = safeZoneW;
+            h = safeZoneH;
+        };
+    };
+    class Controls : Controls
+    {
+        class CloseButton : CloseButton
+        {
+            idc = -1;
+            text = $STR_antistasi_dialogs_hqpos_close;
+            onButtonClick = "closeDialog 0";
+            x = safeZoneX;
+            y = safeZoneY;
+            w = 30 * GRID_W;
+            h = 6 * GRID_H;
+        };
+
+        class MapZonesGroup : A3A_ControlsGroupNoScrollbars
+        {
+            x = safeZoneX;
+            y = 8 * GRID_H;
+            w = 30 * GRID_W;
+            h = 46 * GRID_H;
+
+            class Controls
+            {
+                class MapZonesText : A3A_Text
+                {
+                    idc = -1;
+                    text = $STR_antistasi_dialogs_setup_ez_map_zones;
+                    x = 0;
+                    y = 0;
+                    w = 30 * GRID_W;
+                    h = 5 * GRID_H;
+                    colorBackground[] = A3A_COLOR_BUTTON_BACKGROUND;
+                    style = ST_CENTER + ST_UPPERCASE;
+                    font = A3A_BUTTON_FONT;
+                };
+                class MapZonesBackground : A3A_Background
+                {
+                    idc = -1;
+                    x = 0;
+                    y = 0;
+                    w = 30 * GRID_W;
+                    h = 46 * GRID_H;
+                };
+                class OutpostsCheck : A3A_Checkbox
+                {
+                    idc = A3A_IDC_EDITZONES_OUTPOSTSCHECKBOX;
+                    checked = 1;
+                    onCheckedChanged = "['updateZoneVisibility'] call A3A_fnc_setupEditZonesDialog";
+                    x = 0;
+                    y = 6 * GRID_H;
+                    w = 4 * GRID_W;
+                    h = 4 * GRID_H;
+                };
+                class OutpostsText : A3A_Text
+                {
+                    idc = -1;
+                    text = $STR_antistasi_dialogs_setup_ez_outposts;
+                    x = 4 * GRID_W;
+                    y = 6 * GRID_H;
+                    w = 26 * GRID_W;
+                    h = 4 * GRID_H;
+                };
+                class MilbasesCheck : OutpostsCheck
+                {
+                    idc = A3A_IDC_EDITZONES_MILBASESCHECKBOX;
+                    y = 12 * GRID_H;
+                };
+                class MilbasesText : OutpostsText
+                {
+                    text = $STR_antistasi_dialogs_setup_ez_milbases;
+                    y = 12 * GRID_H;
+                };
+                class AirportsCheck : OutpostsCheck
+                {
+                    idc = A3A_IDC_EDITZONES_AIRPORTSCHECKBOX;
+                    y = 18 * GRID_H;
+                };
+                class AirportsText : OutpostsText
+                {
+                    text = $STR_antistasi_dialogs_setup_ez_airports;
+                    y = 18 * GRID_H;
+                };
+                class ResourcesCheck : OutpostsCheck
+                {
+                    idc = A3A_IDC_EDITZONES_RESOURCESCHECKBOX;
+                    y = 24 * GRID_H;
+                };
+                class ResourcesText : OutpostsText
+                {
+                    text = $STR_antistasi_dialogs_setup_ez_resources;
+                    y = 24 * GRID_H;
+                };
+                class FactoriesCheck : OutpostsCheck
+                {
+                    idc = A3A_IDC_EDITZONES_FACTORIESCHECKBOX;
+                    y = 30 * GRID_H;
+                };
+                class FactoriesText : OutpostsText
+                {
+                    text = $STR_antistasi_dialogs_setup_ez_factories;
+                    y = 30 * GRID_H;
+                };
+                class SeaportsCheck : OutpostsCheck
+                {
+                    idc = A3A_IDC_EDITZONES_SEAPORTSCHECKBOX;
+                    y = 36 * GRID_H;
+                };
+                class SeaportsText : OutpostsText
+                {
+                    text = $STR_antistasi_dialogs_setup_ez_seaports;
+                    y = 36 * GRID_H;
+                };
+            };
+        };
+    };
+};

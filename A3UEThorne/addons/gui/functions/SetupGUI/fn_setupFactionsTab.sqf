@@ -406,8 +406,17 @@ switch (_mode) do
         ];
         if (!_multi) exitWith {};
 
-        private _enabled = cbChecked (_display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK);
+        private _coalitionCtrl = _display displayCtrl THORNE_IDC_SETUP_COALITIONCHECK;
+        private _enabled = cbChecked _coalitionCtrl;
         private _selectedData = [_listbox] call _fnc_getSelectedData;
+
+        // If another UI/update path left this LB_MULTI control with more than
+        // one selected faction, the coalition checkbox must reflect reality.
+        if (count _selectedData > 1 && {!_enabled}) then {
+            _coalitionCtrl cbSetChecked true;
+            _enabled = true;
+            diag_log "[A3UEThorne Coalition] factionSelected auto-enabled coalition for multi-selection";
+        };
         private _order = _listbox getVariable ["Thorne_selectionOrder", []];
         if !(_order isEqualType []) then {
             _order = [_order];

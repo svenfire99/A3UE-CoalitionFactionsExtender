@@ -5,6 +5,14 @@ private _state = [_saveData] call Thorne_fnc_readSetupState;
 missionNamespace setVariable ["Thorne_SetupState", _state];
 
 private _enabled = _state getOrDefault ["coalitionEnabled", false];
+
+diag_log format [
+    "[A3UEThorne Coalition] prepare state enabled=%1 OCC=%2 INV=%3 RIV=%4",
+    _enabled,
+    _state getOrDefault ["occupants", []],
+    _state getOrDefault ["invaders", []],
+    _state getOrDefault ["rivals", []]
+];
 private _slots = [
     ["occupants", "occ"],
     ["invaders", "inv"],
